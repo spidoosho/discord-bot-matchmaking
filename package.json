@@ -1,0 +1,34 @@
+{
+  "name": "valojs",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.427.0",
+    "@aws-sdk/lib-dynamodb": "^3.348.0",
+    "@discordjs/voice": "^0.14.0",
+    "aws-sdk-js-codemod": "^0.18.3",
+    "discord.js": "^14.8.0",
+    "dotenv": "^16.4.4",
+    "mariadb": "^3.2.0",
+    "mysql": "^2.18.1",
+    "node-fetch": "^3.3.1",
+    "path": "^0.12.7",
+    "sequelize": "^6.29.3",
+    "sqlite3": "^5.1.4",
+    "ssh2": "^1.14.0",
+    "twitter-api-v2": "^1.15.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.49.0",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.28.1",
+    "eslint-plugin-n": "^16.1.0",
+    "eslint-plugin-promise": "^6.1.1"
+  }
+}
