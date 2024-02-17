@@ -2,12 +2,12 @@ const fs = require('node:fs')
 const path = require('node:path')
 const { Client, Collection, Events, GatewayIntentBits, InteractionType, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
-const { clientId, guildId, token } = require('./config.json')
 const { REST, Routes } = require('discord.js')
 const { COUNT_PLAYERS_GAME, OFFLINE_STATUS } = require('./src/constants.js')
 const { isQueueInVoice, splitCommand } = require('./src/utils.js')
 const { separatePlayers } = require('./src/game.js')
 const { updatePinnedQueueMessage } = require('./src/messages.js')
+require('dotenv').config()
 
 const playersInQueue = {}
 const lobbyVoiceChannels = {}
@@ -131,7 +131,7 @@ for (const file of commandFiles) {
 }
 
 // Construct and prepare an instance of the REST module
-const rest = new REST({ version: '10' }).setToken(token);
+const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 // deploy commands
 (async () => {
@@ -140,7 +140,7 @@ const rest = new REST({ version: '10' }).setToken(token);
 
     // The put method is used to fully refresh all commands in the guild with the current set
     const data = await rest.put(
-      Routes.applicationGuildCommands(clientId, guildId),
+      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
       { body: commands }
     )
 
@@ -150,4 +150,4 @@ const rest = new REST({ version: '10' }).setToken(token);
   }
 })()
 
-client.login(token)
+client.login(process.env.DISCORD_TOKEN)
