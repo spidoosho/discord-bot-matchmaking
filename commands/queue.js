@@ -1,10 +1,8 @@
 const { SlashCommandBuilder } = require('discord.js')
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js')
 const { createLobby } = require('../src/game.js')
 const { COUNT_PLAYERS_GAME } = require('../src/constants.js')
 const { getPlayerDataFromDb, addPlayerToDB } = require('../src/database.js')
-// const { isQueueInVoice } = require('../src/utils.js')
-// const { getMapAndRolePrefComponents } = require('../src/messages.js')
+const { createQueueMessage } = require('../src/messages.js')
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -13,19 +11,11 @@ module.exports = {
   async execute (input) {
     console.log('[DEBUG]: Executing queue')
 
-    // add button to dequeue to the message
-    const row = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('dequeue')
-          .setLabel('Leave the queue')
-          .setStyle(ButtonStyle.Primary)
-      )
+    const isPlayerNotInQueue = !(input.interaction.user.id in input.playersInQueue)
 
-    // check if user is in queue
-    if (input.interaction.user.id in input.playersInQueue) {
-      const message = 'You are already in queue. (This message will be deleted after 1 minute)'
-      return input.interaction.reply({ content: message, components: [row], ephemeral: true }).then(async () =>
+    // player is already in queue
+    if (!isPlayerNotInQueue) {
+      return input.interaction.reply(createQueueMessage(isPlayerNotInQueue)).then(async () =>
         setTimeout(async () => await input.interaction.deleteReply(), 60000)
       )
     }
@@ -60,8 +50,7 @@ module.exports = {
     */
 
     // return message to print
-    const message = 'You have joined the queue. (This message will be deleted after 1 minute)'
-    const reply = await input.interaction.reply({ content: message, components: [row], ephemeral: true }).then(async (reply) =>
+    const reply = await input.interaction.reply(createQueueMessage(isPlayerNotInQueue)).then(async (reply) =>
       setTimeout(async () => await reply.delete(), 60000)
     )
     return reply

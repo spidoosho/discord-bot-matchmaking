@@ -46,8 +46,7 @@ module.exports = {
     await updateElosAndGameCounts(input.dbclient, Object.values(game.teamOne).concat(Object.values(game.teamTwo)))
     delete input.ongoingGames[gameId]
 
-    const message = createResultMessage(game)
-    return input.interaction.reply(message).then(async () =>
+    return input.interaction.reply(createResultMessage(game)).then(async () =>
       setTimeout(async () => {
         for (const channelId of [game.textID, game.voiceID, ...game.teamChannelIds]) {
           const channel = await input.interaction.guild.channels.fetch(channelId)

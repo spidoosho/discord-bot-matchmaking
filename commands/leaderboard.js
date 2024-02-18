@@ -9,13 +9,6 @@ module.exports = {
   async execute (input) {
     console.log('[DEBUG]: Executing leaderboard')
 
-    const leaderboardMessage = createLeaderboardMessage(await getLeaderboard(input.dbclient))
-    try {
-      const a = await input.interaction.guild.members.list()
-      console.log(a)
-    } catch (e) {
-      console.log(e)
-    }
-    return input.interaction.reply(leaderboardMessage)
+    return input.interaction.reply(createLeaderboardMessage(await getLeaderboard(input.dbclient)))
   }
 }

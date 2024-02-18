@@ -2,6 +2,61 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('
 const { QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID } = require('./constants.js')
 const { getNumberStrWithOperand } = require('./utils.js')
 
+function createQueueMessage (wasSuccessful) {
+  // add button to dequeue to the message
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('dequeue')
+        .setLabel('Leave the queue')
+        .setStyle(ButtonStyle.Primary)
+    )
+
+  let message = '(This message will be deleted after 1 minute)'
+
+  if (wasSuccessful) {
+    message = `You have joined the queue. ${message}`
+  } else {
+    message = `You are already in queue! ${message}`
+  }
+
+  return { content: message, components: [row], ephemeral: true }
+}
+
+function createDequeueMessage (wasSuccessful) {
+  // add button to queue to the message
+  let message = '(This message will be deleted after 1 minute)'
+
+  if (wasSuccessful) {
+    message = `You have been dequeued. ${message}`
+  } else {
+    message = `You are not in queue! ${message}`
+  }
+
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('queue')
+        .setLabel('Join the queue')
+        .setStyle(ButtonStyle.Primary)
+    )
+
+  return { content: message, components: [row], ephemeral: true }
+}
+
+function createAutoDequeueMessage (userId) {
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId('queue')
+        .setLabel('Join the queue while being offline')
+        .setStyle(ButtonStyle.Primary)
+    )
+  const message = `<@${userId}>, You have been dequeued because your status changed to offline and we do not know if you are still here.`
+
+  return { content: message, components: [row], ephemeral: true }
+}
+
 function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName) {
   let teamOne = `<@${teams.teamOne[0].id.N}>`
   let teamTwo = `<@${teams.teamTwo[0].id.N}>`
@@ -35,7 +90,7 @@ function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName) {
     )
     .setTimestamp()
 
-  return { embed, row }
+  return { embeds: [embed], components: [row] }
 }
 
 async function updatePinnedQueueMessage (count, connection) {
@@ -80,68 +135,6 @@ async function setPinnedQueueMessage (client, count) {
 
   const queueChannel = await client.channels.fetch(QUEUE_CHANNEL_ID)
   await queueChannel.send({ content: '', embeds: [exampleEmbed], components: [row] })
-}
-
-function createQueueMessage () {
-  const row = new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('remove_haven')
-        .setLabel('Haven')
-        .setStyle(ButtonStyle.Danger)
-    )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('remove_split')
-        .setLabel('Split')
-        .setStyle(ButtonStyle.Danger)
-    )
-
-  const embed = new EmbedBuilder()
-    .setColor(0x0099FF)
-    .setTitle('Game Found!')
-    .setDescription('Choose map to give lesser preference')
-
-  return { embed, row }
-}
-
-function getMapAndRolePrefComponents (row) {
-  if (!row) {
-    row = new ActionRowBuilder()
-  }
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId('edit_map_preferences')
-      .setLabel('Edit map preferences')
-      .setStyle(ButtonStyle.Primary)
-  )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('edit_role_preferences')
-        .setLabel('Edit role preferences')
-        .setStyle(ButtonStyle.Primary)
-    )
-
-  return row
-}
-
-function getRoleButtons (row) {
-  if (!row) {
-    row = new ActionRowBuilder()
-  }
-
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId('edit_map_preferences')
-      .setLabel('Edit map preferences')
-      .setStyle(ButtonStyle.Primary)
-  )
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId('edit_role_preferences')
-        .setLabel('Edit role preferences')
-        .setStyle(ButtonStyle.Primary)
-    )
 }
 
 function createResultMessage (game) {
@@ -215,4 +208,4 @@ function createMessageAboutPlayer (playerData) {
   return { embeds: [embed], ephemeral: true }
 }
 
-module.exports = { createTeamsMessage, createQueueMessage, getMapAndRolePrefComponents, getRoleButtons, updatePinnedQueueMessage, setPinnedQueueMessage, createResultMessage, createLeaderboardMessage, createMessageAboutPlayer }
+module.exports = { createDequeueMessage, createAutoDequeueMessage, createTeamsMessage, createQueueMessage, updatePinnedQueueMessage, setPinnedQueueMessage, createResultMessage, createLeaderboardMessage, createMessageAboutPlayer }

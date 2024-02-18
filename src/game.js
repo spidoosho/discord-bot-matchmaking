@@ -1,23 +1,29 @@
 const { ChannelType } = require('discord.js')
 const { TMP_GAME_CHANNEL_ID, COUNT_PLAYERS_GAME } = require('../src/constants.js')
 const { createTeamsMessage } = require('../src/messages.js')
+
 /**
  * Creates text and voice channel for a game.
  * @param {Object} input input dictionary
  */
 async function createLobby (input) {
-  const firstPlayers = {}
+  // TODO: temporarily get first 10 players
+
+  // remove players from queue
+  // while going through players, get players ids for tagging
+  const players = {}
   let playersIdStr = ''
   for (const [key, value] of Object.entries(input.playersInQueue)) {
     if (value.posInQueue < COUNT_PLAYERS_GAME) {
-      firstPlayers[key] = value
+      players[key] = value
       delete input.playersInQueue[key]
       playersIdStr += `<@${value.id.N}> `
     }
   }
 
   // creates a temporary voice channel to gather chosen players
-  const playerName = firstPlayers[Object.keys(firstPlayers)[0]].displayName.S
+  // get unique name by indexing channel
+  const playerName = players[Object.keys(players)[0]].displayName.S
   let newLobbyName = `game-${playerName}`
   let index = 0
   while (input.interaction.guild.channels.cache.find(channel => channel.name === newLobbyName)) {
@@ -30,6 +36,7 @@ async function createLobby (input) {
   }).then(result => result.id)
 
   // creates a text channel for game info and for players to chat
+  // send a message tagging players to join voice lobby channel
   const textId = await input.interaction.member.guild.channels.create({
     name: newLobbyName,
     type: ChannelType.GuildText,
@@ -39,8 +46,8 @@ async function createLobby (input) {
     return channel.id
   })
 
-  // set voiceID
-  input.lobbyVoiceChannels[voiceId] = { textID: textId, players: firstPlayers }
+  // set lobby voice channel
+  input.lobbyVoiceChannels[voiceId] = { textID: textId, players }
 }
 
 function balanceTeams (queue) {
@@ -140,8 +147,7 @@ async function separatePlayers (gameInfo) {
   gameInfo.teamNames = [teamOneName, teamTwoName]
   // create message for players to submit game result
   const textChannel = await gameInfo.guild.channels.fetch(gameInfo.textID)
-  const matchMessage = createTeamsMessage(gameInfo.textID, teams, teamOneName, teamTwoName)
-  textChannel.send({ embeds: [matchMessage.embed], components: [matchMessage.row] })
+  textChannel.send(createTeamsMessage(gameInfo.textID, teams, teamOneName, teamTwoName))
 
   // get players in temporary voice channel
   const channel = await gameInfo.guild.channels.fetch(gameInfo.voiceID)

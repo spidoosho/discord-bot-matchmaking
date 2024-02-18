@@ -9,8 +9,6 @@ module.exports = {
   async execute (input) {
     console.log('[DEBUG]: executing me')
 
-    const playerMessage = createMessageAboutPlayer(await getPlayerDataFromDb(input.dbclient, input.interaction.user.id))
-
-    return input.interaction.reply(playerMessage)
+    return input.interaction.reply(createMessageAboutPlayer(await getPlayerDataFromDb(input.dbclient, input.interaction.user.id)))
   }
 }

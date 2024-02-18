@@ -93,27 +93,3 @@ function balanceTeams (queue) {
 }
 
 module.exports = { getRandomInt, balanceTeams }
-
-const queue = [
-  { id: 1, elo: 20, name: 'prvni' },
-  { id: 2, elo: 30, name: 'druhy' },
-  { id: 3, elo: 40, name: 'treti' },
-  { id: 4, elo: 50, name: 'ctvrty' },
-  { id: 5, elo: 70, name: 'paty' },
-  { id: 6, elo: 60, name: 'sesty' },
-  { id: 7, elo: 20, name: 'sedmy' },
-  { id: 8, elo: 95, name: 'osmy' },
-  { id: 9, elo: 55, name: 'devaty' },
-  { id: 10, elo: 45, name: 'desaty' }
-]
-const arr = balanceTeams(queue)
-let diff = 0
-for (const player of arr.team_one) {
-  diff += player.elo
-}
-
-for (const player of arr.team_two) {
-  diff -= player.elo
-}
-console.log(diff)
-console.log(arr)
