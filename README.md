@@ -1,5 +1,9 @@
 # Discord bot matchmaking
 
+Text for the thesis [on Overleaf](https://www.overleaf.com/1542287416zpjjcmndcvmd#a54dcf)
+
+Supportive API project querying database [here](https://github.com/spiduso/Pro-City-API)
+
 Current temporary notes for thesis:
 
 - game graph loop
@@ -15,6 +19,7 @@ Current temporary notes for thesis:
 ### Matchmaking - výběr hráčů do zápasu
 
 - sliding windows pro určitý rozsah hodnocení
+- imbalance funkce k rozhodnutí o kvalitě matchmakingu
 
 ### Team balancing - vybalancování týmů
 
@@ -23,6 +28,7 @@ Current temporary notes for thesis:
 
 ### Map selection - výběr mapy
 
+- každému hráči vypočítat skóre ke každé mapě
 - vybalancovat, aby hráči hráli všechny mapy stejněkrát
 - nechat hráče vybrat z top 3 map
 
@@ -107,5 +113,19 @@ table above shows percentage of game result based on team tactic usage
   - alfa - parameter with which we decide how more important fairness is than uniformity
 
 [^TheoricalFoundations]: [Alman, J. and McKay, D., 2017, May. Theoretical foundations of team matchmaking. In Proceedings of the 16th Conference on Autonomous Agents and MultiAgent Systems (pp. 1073-1081).](https://www.ifaamas.org/Proceedings/aamas2017/pdfs/p1073.pdf)
+
+### Matchmaking in multi-player on-line games[^MatchmakingInMultiplayer]
+
+- studies matchmaking in LOL
+- queue time, matching accuracy, server response time
+- For every difference of 400 points, the team/player with the highest score is ten times as likely to win as the other team/player.
+- premade groups adds to complexity of matchmaking
+
+[^MatchmakingInMultiplayer]: [Véron, M., Marin, O. and Monnet, S., 2014, March. Matchmaking in multi-player on-line games: studying user traces to improve the user experience. In Proceedings of Network and Operating System Support on Digital Audio and Video Workshop (pp. 7-12).](https://dl.acm.org/doi/abs/10.1145/2578260.2578265?casa_token=eZw5RWloS64AAAAA:B4tPhSylAssjpABNPpNqEJDKuop_Y9Oy6IfnZf8ZycHUl-LF9ZLX4K6IIXFf_erCmtOTbdZBCeqLBA)
+
+### An engagement optimized matchmaking framework[^EOMM]
+
+
+[^EOMM]: [Chen, Z., Xue, S., Kolen, J., Aghdaie, N., Zaman, K.A., Sun, Y. and Seif El-Nasr, M., 2017, April. Eomm: An engagement optimized matchmaking framework. In Proceedings of the 26th International Conference on World Wide Web (pp. 1143-1150).](https://dl.acm.org/doi/abs/10.1145/3038912.3052559?casa_token=nM64vwMvMTwAAAAA:F0YiB-FeepVbFk1ZPgR7X86-mFN7CpZq2TWBuU9rUn3UQwxfiAB47Hn59pHhV0D1PnT3z0Ja63xmHA)
 
 ### TrueSkill
