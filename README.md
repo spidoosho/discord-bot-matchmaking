@@ -34,6 +34,8 @@ Current temporary notes for thesis:
 
 ### Scoring - ohodnocení hráčů
 
+- weighted elo - po hře požádat hráče o výsledné skóre; zakomponovat do scoring
+
 #### Nápad #1: Offline evaluation
 
 - rekonstrukce proběhlých zápasů zaznamenaných v historii zápasů pomocí vlastního hodnotícího algoritmu a porovnání s ohodnocením od [NeatQueue](https://www.neatqueue.com/leaderboard/1061301529597976700/1061303977460908173). Zápasy jsou uloženy na stránkách třetí strany [tracker.gg](https://tracker.gg/valorant/profile/riot/SEN%20tarik%231337/customs).
@@ -128,4 +130,60 @@ table above shows percentage of game result based on team tactic usage
 
 [^EOMM]: [Chen, Z., Xue, S., Kolen, J., Aghdaie, N., Zaman, K.A., Sun, Y. and Seif El-Nasr, M., 2017, April. Eomm: An engagement optimized matchmaking framework. In Proceedings of the 26th International Conference on World Wide Web (pp. 1143-1150).](https://dl.acm.org/doi/abs/10.1145/3038912.3052559?casa_token=nM64vwMvMTwAAAAA:F0YiB-FeepVbFk1ZPgR7X86-mFN7CpZq2TWBuU9rUn3UQwxfiAB47Hn59pHhV0D1PnT3z0Ja63xmHA)
 
-### TrueSkill
+### Weighted Elo rating for tennis match predictions[^WEloTennis]
+
+- instead of calculating regular elo, study suggests weighted elo: instead of retrieving and taking into account only win or loss, also incorporate score (number of games [in a set] won)
+
+[^WEloTennis]: [Angelini, G., Candila, V. and De Angelis, L., 2022. Weighted Elo rating for tennis match predictions. European Journal of Operational Research, 297(1), pp.120-132.](https://www.sciencedirect.com/science/article/pii/S0377221721003234)
+
+### How do the mechanics of honor systems in competitive games facilitate or hinder a toxic game aesthetic?[^honoringSystem]
+
+- honoring system is reducing toxic activity only if it gives some kind of reward
+
+[^honoringSystem]: [Larsson, L. and Johnsson, A.K., 2021. How do the mechanics of honor systems in competitive games facilitate or hinder a toxic game aesthetic?.](https://www.diva-portal.org/smash/record.jsf?pid=diva2:1562509)
+
+### Competitive Balance in Team Sports Games[^CompetitiveBalance]
+
+- if player is not valued only by his skill rating but by his set of features, then competitive balancing can be up to 15% better than linear predictors
+
+[^CompetitiveBalance]: [Nikolakaki, S.M., Dibie, O., Beirami, A., Peterson, N., Aghdaie, N. and Zaman, K., 2020, August. Competitive balance in team sports games. In 2020 IEEE Conference on Games (CoG) (pp. 526-533). IEEE.](https://ieeexplore.ieee.org/abstract/document/9231859/)
+
+### In Other games
+
+#### Apex Legends
+
+#### The Realm
+
+- only for people of certain rank in official matchmaking
+- user joins Discord voice channel queue and then are separated into teams
+- separated points for game and elo rating
+- point degradation for inactiveness
+- teams are beforehand ranked based on team elo and then new elo is calculated based on difference of #teamRank and #teamPlacement
+
+#### CS2
+
+##### FACEIT
+
+- team balance calculated solely on teams' ratings
+- player is rated by elo, each range of elo is divided into elo range + last rank is top1000 only
+- team rating is calculated based on skill level, player-stacks, number of matches played by each player, variance in skill levels among the team
+
+#### League of legends
+
+##### Champions queue
+
+- for pro players and aspiring pro players
+- connected to Riot API, so elo rating is same as in game
+- queue and team balancing is done through Discord
+- Season is separated into splits, players gains points based on ranking in splits
+- After the season the person with most points wins, not the one with highest elo
+
+#### Valorant
+
+##### Pro City
+
+- everything is done on Discord
+- score is reset each month
+- leadeboard is sorted based on peak rating
+
+### TrueSkill, Glicko
