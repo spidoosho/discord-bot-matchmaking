@@ -1,6 +1,7 @@
 const fs = require('node:fs')
+const express = require('express')
 const path = require('node:path')
-const AWS = require('aws-sdk');
+const AWS = require('aws-sdk')
 const { Client, Collection, Events, GatewayIntentBits, InteractionType } = require('discord.js')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { REST, Routes } = require('discord.js')
@@ -34,6 +35,9 @@ client.once(Events.ClientReady, async () => {
   }
   await checkForGuildTables(dbclient, guildIds)
   console.debug('Ready!')
+  const app = express()
+  const port = process.env.PORT || 9001
+  app.listen(port, () => console.debug(`Listening to port ${port}`))
 })
 
 /**

@@ -17,6 +17,7 @@
     "aws-sdk-js-codemod": "^0.18.3",
     "discord.js": "^14.8.0",
     "dotenv": "^16.4.4",
+    "express": "^4.19.2",
     "mariadb": "^3.2.0",
     "mysql": "^2.18.1",
     "node-fetch": "^3.3.1",
