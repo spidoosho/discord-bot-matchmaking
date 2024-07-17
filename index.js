@@ -1,7 +1,5 @@
 const fs = require('node:fs')
-const express = require('express')
 const path = require('node:path')
-const AWS = require('aws-sdk')
 const { Client, Collection, Events, GatewayIntentBits, InteractionType } = require('discord.js')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { REST, Routes } = require('discord.js')
@@ -10,18 +8,16 @@ const { isQueueInVoice, splitCommand, addVoteForMap, selectMap } = require('./sr
 const { separatePlayers, setGameResult } = require('./src/game.js')
 const { resetMapPreference, updateMapPreference, createOrClearGuildTables, removeGuildTables, checkForGuildTables } = require('./src/database.js')
 const { createAutoDequeueMessage } = require('./src/messages.js')
+const { startExpress } = require('./express/express.js')
 require('dotenv').config()
 
 const playersInQueue = {}
 const lobbyVoiceChannels = {}
 const ongoingGames = {}
 
-AWS.config.update({ logger: console })
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildPresences] })
 const dbclient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION, credentials: { accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID, secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY } })
-console.log('CREDENTIALS')
-console.log(AWS.config.credentials)
-console.log('=========================================================')
+
 client.once(Events.ClientReady, async () => {
   /*
   await tweet({
@@ -34,10 +30,8 @@ client.once(Events.ClientReady, async () => {
     guildIds.push(guild[0])
   }
   await checkForGuildTables(dbclient, guildIds)
+  startExpress()
   console.debug('Ready!')
-  const app = express()
-  const port = process.env.PORT || 9001
-  app.listen(port, () => console.debug(`Listening to port ${port}`))
 })
 
 /**
