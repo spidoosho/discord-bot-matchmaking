@@ -1,5 +1,6 @@
 const fs = require('node:fs')
 const path = require('node:path')
+const AWS = require('aws-sdk');
 const { Client, Collection, Events, GatewayIntentBits, InteractionType } = require('discord.js')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { REST, Routes } = require('discord.js')
@@ -14,9 +15,12 @@ const playersInQueue = {}
 const lobbyVoiceChannels = {}
 const ongoingGames = {}
 
+AWS.config.update({ logger: console })
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildPresences] })
 const dbclient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION, credentials: { accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID, secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY } })
-
+console.log('CREDENTIALS')
+console.log(AWS.config.credentials)
+console.log('=========================================================')
 client.once(Events.ClientReady, async () => {
   /*
   await tweet({
