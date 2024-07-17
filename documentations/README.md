@@ -1,4 +1,4 @@
-# Discord bot match making
+# Documentations
 
 Discord bot for Valorant third-party match making.
 
