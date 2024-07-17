@@ -126,27 +126,36 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 
   if (!command) {
+    try {
     // custom interaction
-    let message = 'Done'
-    let messageSent = false
-    switch (flagAndParams.flag) {
-      case 'resetmappreference':
-        message = await resetMapPreference({ interaction, dbclient, values: flagAndParams.params })
-        break
-      case 'updatemappreference':
-        message = await updateMapPreference({ interaction, dbclient, values: flagAndParams.params })
-        break
-      case 'setgameresult':
-        await setGameResult({ interaction, params: flagAndParams.params, dbclient, ongoingGames, playersInQueue })
-        messageSent = true
-        break
-      case 'chosenmap':
-        message = addVoteForMap({ interaction, params: flagAndParams.params, lobbyVoiceChannels })
-        break
-    }
+      let message = 'Done'
+      let messageSent = false
+      switch (flagAndParams.flag) {
+        case 'resetmappreference':
+          message = await resetMapPreference({ interaction, dbclient, values: flagAndParams.params })
+          break
+        case 'updatemappreference':
+          message = await updateMapPreference({ interaction, dbclient, values: flagAndParams.params })
+          break
+        case 'setgameresult':
+          await setGameResult({ interaction, params: flagAndParams.params, dbclient, ongoingGames, playersInQueue })
+          messageSent = true
+          break
+        case 'chosenmap':
+          message = addVoteForMap({ interaction, params: flagAndParams.params, lobbyVoiceChannels })
+          break
+      }
 
-    if (!messageSent) {
-      await interaction.reply({ content: message, ephemeral: true })
+      if (!messageSent) {
+        await interaction.reply({ content: message, ephemeral: true })
+      }
+    } catch (error) {
+      console.error(error)
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true })
+      } else {
+        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true })
+      }
     }
 
     return
@@ -159,14 +168,8 @@ client.on(Events.InteractionCreate, async interaction => {
       case 'dequeue':
         await command.execute({ interaction, playersInQueue, lobbyVoiceChannels, dbclient })
         break
-      case 'list':
-        await command.execute({ interaction, playersInQueue })
-        break
-      case 'clear':
+      case 'example':
         await command.execute({ interaction })
-        break
-      case 'debug':
-        await command.execute({ interaction, client })
         break
       case 'leaderboard':
         await command.execute({ interaction, dbclient })
