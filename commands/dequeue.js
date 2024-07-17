@@ -14,8 +14,6 @@ module.exports = {
       delete input.playersInQueue[input.interaction.user.id]
     }
 
-    return input.interaction.reply(createDequeueMessage(isUserInQueue)).then(async () =>
-      setTimeout(async () => await input.interaction.deleteReply(), 60000)
-    )
+    return input.interaction.reply(createDequeueMessage(isUserInQueue))
   }
 }

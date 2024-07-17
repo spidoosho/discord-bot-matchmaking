@@ -127,7 +127,6 @@ table above shows percentage of game result based on team tactic usage
 
 ### An engagement optimized matchmaking framework[^EOMM]
 
-
 [^EOMM]: [Chen, Z., Xue, S., Kolen, J., Aghdaie, N., Zaman, K.A., Sun, Y. and Seif El-Nasr, M., 2017, April. Eomm: An engagement optimized matchmaking framework. In Proceedings of the 26th International Conference on World Wide Web (pp. 1143-1150).](https://dl.acm.org/doi/abs/10.1145/3038912.3052559?casa_token=nM64vwMvMTwAAAAA:F0YiB-FeepVbFk1ZPgR7X86-mFN7CpZq2TWBuU9rUn3UQwxfiAB47Hn59pHhV0D1PnT3z0Ja63xmHA)
 
 ### Weighted Elo rating for tennis match predictions[^WEloTennis]

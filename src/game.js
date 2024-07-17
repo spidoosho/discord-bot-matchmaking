@@ -1,14 +1,14 @@
 const { ChannelType } = require('discord.js')
-const { TMP_GAME_CHANNEL_ID, COUNT_PLAYERS_GAME } = require('../src/constants.js')
-const { createTeamsMessage } = require('../src/messages.js')
+const { COUNT_PLAYERS_GAME } = require('../src/constants.js')
+const { createTeamsMessage, createResultMessage, createSelectMapMessage } = require('../src/messages.js')
+const { getAverageTeamElo, getGamesCategoryChannel } = require('../src/utils.js')
+const { updateElosAndGameCounts, getPlayersMapsPreferences, getMapNames } = require('../src/database.js')
 
 /**
  * Creates text and voice channel for a game.
  * @param {Object} input input dictionary
  */
 async function createLobby (input) {
-  // TODO: temporarily get first 10 players
-
   // remove players from queue
   // while going through players, get players ids for tagging
   const players = {}
@@ -21,6 +21,12 @@ async function createLobby (input) {
     }
   }
 
+  const maps = await getSuitableMaps(input.dbclient, Object.keys(players), input.interaction.guildId)
+  const mapNames = await getMapNames(input.dbclient, maps)
+
+  for (const map of mapNames) {
+    map.count = 0
+  }
   // creates a temporary voice channel to gather chosen players
   // get unique name by indexing channel
   const playerName = players[Object.keys(players)[0]].displayName.S
@@ -29,10 +35,13 @@ async function createLobby (input) {
   while (input.interaction.guild.channels.cache.find(channel => channel.name === newLobbyName)) {
     newLobbyName = `game-${playerName}-${++index}`
   }
+
+  const gameCategoryChannel = await getGamesCategoryChannel(input.interaction.guild)
+
   const voiceId = await input.interaction.member.guild.channels.create({
     name: newLobbyName,
     type: ChannelType.GuildVoice,
-    parent: TMP_GAME_CHANNEL_ID
+    parent: gameCategoryChannel.id
   }).then(result => result.id)
 
   // creates a text channel for game info and for players to chat
@@ -40,62 +49,180 @@ async function createLobby (input) {
   const textId = await input.interaction.member.guild.channels.create({
     name: newLobbyName,
     type: ChannelType.GuildText,
-    parent: TMP_GAME_CHANNEL_ID
+    parent: gameCategoryChannel.id
   }).then(channel => {
-    channel.send(`Please join <#${voiceId}> to start the game: ${playersIdStr}`)
+    channel.send(`Players selected for this game: ${playersIdStr}`)
+    channel.send(createSelectMapMessage(mapNames, voiceId))
+    channel.send(`Please join <#${voiceId}> to start the game.`)
     return channel.id
   })
 
   // set lobby voice channel
-  input.lobbyVoiceChannels[voiceId] = { textID: textId, players }
+  input.lobbyVoiceChannels[voiceId] = { textID: textId, players, maps: mapNames }
+}
+
+async function getSuitableMaps (dbclient, playerIds, guildId) {
+  const mapsPrefsDict = await getPlayersMapsPreferences(dbclient, playerIds, guildId)
+
+  const bestLeastMiseryArr = getBestLeastMiseryMapIndices(Object.values(mapsPrefsDict))
+  const bestAverageArr = getBestAverageMapIndices(Object.values(mapsPrefsDict))
+  const bestPleasureArr = getbestPleasureMapIndices(Object.values(mapsPrefsDict))
+
+  const result = []
+  result.push(getFirstUniqueIndex(bestLeastMiseryArr, result))
+  result.push(getFirstUniqueIndex(bestAverageArr, result))
+  result.push(getFirstUniqueIndex(bestPleasureArr, result))
+  return result
+}
+
+function getFirstUniqueIndex (mapArr, uniqueArr) {
+  for (let i = 0; i < mapArr.length; i++) {
+    if (!uniqueArr.includes(mapArr[i])) {
+      return mapArr[i]
+    }
+  }
+
+  throw new Error('uniqueArr length is greater than mapArr length')
+}
+
+function getbestPleasureMapIndices (preferencesArr) {
+  const result = []
+  const pleasureDict = {}
+  for (let mapIndex = 0; mapIndex < preferencesArr[0].length; mapIndex++) {
+    let maxPref = 0
+    for (const playerPrefArr of preferencesArr) {
+      if (playerPrefArr[mapIndex] > maxPref) {
+        maxPref = playerPrefArr[mapIndex]
+      }
+    }
+
+    pleasureDict[mapIndex] = maxPref
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const mapIndex = getBestValueMapIndex(pleasureDict)
+    result.push(mapIndex)
+    delete pleasureDict[mapIndex]
+  }
+
+  return result
+}
+
+function getBestAverageMapIndices (preferencesArr) {
+  const result = []
+  const averageDict = {}
+  for (let mapIndex = 0; mapIndex < preferencesArr[0].length; mapIndex++) {
+    let sum = 0
+    for (const playerPrefArr of preferencesArr) {
+      sum += playerPrefArr[mapIndex]
+    }
+
+    averageDict[mapIndex] = sum / preferencesArr.length
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const mapIndex = getBestValueMapIndex(averageDict)
+    result.push(mapIndex)
+    delete averageDict[mapIndex]
+  }
+
+  return result
+}
+
+function getBestLeastMiseryMapIndices (preferencesArr) {
+  const result = []
+  const leastMiseryDict = {}
+  for (let mapIndex = 0; mapIndex < preferencesArr[0].length; mapIndex++) {
+    let minPref = 10
+    for (const playerPrefArr of preferencesArr) {
+      if (playerPrefArr[mapIndex] < minPref) {
+        minPref = playerPrefArr[mapIndex]
+      }
+    }
+
+    leastMiseryDict[mapIndex] = minPref
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const mapIndex = getBestValueMapIndex(leastMiseryDict)
+    result.push(mapIndex)
+    delete leastMiseryDict[mapIndex]
+  }
+
+  return result
+}
+
+function getBestValueMapIndex (leastMiseryDict) {
+  let maxPrefIndex = 0
+  let maxPref = 0
+  for (const [mapIndex, minPref] of Object.entries(leastMiseryDict)) {
+    if (minPref > maxPref) {
+      maxPrefIndex = mapIndex
+      maxPref = minPref
+    }
+  }
+
+  return maxPrefIndex
 }
 
 function balanceTeams (queue) {
   // get array of elos
-  const elos = []
+  let elos = []
   Object.keys(queue).forEach(id => {
     elos.push(parseInt(queue[id].elo.N))
   })
 
-  const teamCount = COUNT_PLAYERS_GAME / 2
-  let minDiff = getSum(elos)
-  let minSet = new Set()
+  elos = elos.sort((a, b) => b - a)
 
-  function getSum (array) {
-    let sum = 0
-    array.forEach(elo => { sum += elo })
-    return sum
-  }
+  const teamOneElos = []
+  const teamTwoElos = []
 
-  function findMinDiff (array, start, elos, sum, totalSum) {
-    if (array.length === teamCount) {
-      const currentDiff = Math.abs(totalSum - 2 * getSum(array))
-      if (minDiff > currentDiff) {
-        minDiff = currentDiff
-        minSet = new Set(array)
-      }
-      return minDiff
-    }
+  let i = 0
+  let teamOneSum = elos[i]
+  teamOneElos.push(elos[i++])
 
-    for (let i = start; i < elos.length; i++) {
-      array.push(elos[i])
-      findMinDiff(array, i + 1, elos, sum, totalSum)
-      array.pop()
+  let teamTwoSum = elos[i]
+  teamTwoElos.push(elos[i++])
+
+  for (; i < elos.length && teamOneElos.length < COUNT_PLAYERS_GAME && teamTwoElos.length < COUNT_PLAYERS_GAME; i++) {
+    if (teamOneSum / teamOneElos.length > teamTwoSum / teamTwoElos.length) {
+      teamTwoElos.push(elos[i])
+      teamTwoSum += elos[i]
+    } else {
+      teamOneElos.push(elos[i])
+      teamOneSum += elos[i]
     }
   }
 
-  findMinDiff([], 0, elos, 0, getSum(elos))
+  while (teamOneElos.length < COUNT_PLAYERS_GAME) {
+    teamOneElos.push(elos[i])
+    teamOneSum += elos[i]
+    i++
+  }
+
+  while (teamTwoElos.length < COUNT_PLAYERS_GAME) {
+    teamTwoElos.push(elos[i])
+    teamTwoSum += elos[i]
+    i++
+  }
 
   const teamOne = []
   const teamTwo = []
+
   Object.keys(queue).forEach(id => {
     const elo = parseInt(queue[id].elo.N)
-    if (minSet.has(elo)) {
+
+    let index = teamOneElos.indexOf(elo)
+    if (index > -1) {
       teamOne.push(queue[id])
+      teamOneElos.splice(index, 1)
     } else {
-      teamTwo.push(queue[id])
+      index = teamTwoElos.indexOf(elo)
+      if (index > -1) {
+        teamTwo.push(queue[id])
+        teamTwoElos.splice(index, 1)
+      }
     }
-    minSet.delete(elo)
   })
 
   return { teamOne, teamTwo }
@@ -110,7 +237,7 @@ function getNewElo (playerElo, opponentElo, actualScore, gamesPlayed) {
   return Math.round(playerElo + K * (actualScore - expectedScore))
 }
 
-async function separatePlayers (gameInfo) {
+async function separatePlayers (gameInfo, selectedMap) {
   // separate players into two teams for most equal game
   const teams = balanceTeams(gameInfo.players)
   gameInfo.teamOne = teams.teamOne
@@ -124,10 +251,12 @@ async function separatePlayers (gameInfo) {
     teamOneName = `team-${playerName}-${++index}`
   }
 
+  const gameCategoryChannel = await getGamesCategoryChannel(gameInfo.guild)
+
   const teamOneVoice = await gameInfo.guild.channels.create({
     name: teamOneName,
     type: ChannelType.GuildVoice,
-    parent: TMP_GAME_CHANNEL_ID
+    parent: gameCategoryChannel.id
   }).then(channel => channel)
 
   playerName = teams.teamTwo[0].displayName.S
@@ -140,14 +269,15 @@ async function separatePlayers (gameInfo) {
   const teamTwoVoice = await gameInfo.guild.channels.create({
     name: teamTwoName,
     type: ChannelType.GuildVoice,
-    parent: TMP_GAME_CHANNEL_ID
+    parent: gameCategoryChannel.id
   }).then(channel => channel)
 
   gameInfo.teamChannelIds = [teamOneVoice.id, teamTwoVoice.id]
   gameInfo.teamNames = [teamOneName, teamTwoName]
+  gameInfo.map = selectedMap
   // create message for players to submit game result
   const textChannel = await gameInfo.guild.channels.fetch(gameInfo.textID)
-  textChannel.send(createTeamsMessage(gameInfo.textID, teams, teamOneName, teamTwoName))
+  textChannel.send(createTeamsMessage(gameInfo.textID, teams, teamOneName, teamTwoName, selectedMap.Name))
 
   // get players in temporary voice channel
   const channel = await gameInfo.guild.channels.fetch(gameInfo.voiceID)
@@ -170,4 +300,52 @@ async function separatePlayers (gameInfo) {
   return { id: textChannel.id, gameInfo }
 }
 
-module.exports = { balanceTeams, createLobby, separatePlayers, getNewElo }
+async function setGameResult (input) {
+  const buttonData = input.interaction.customId.split('_')
+  const gameId = buttonData[1]
+  const winnerTeamId = parseInt(buttonData[2])
+
+  const game = input.ongoingGames[gameId]
+  game.winnerTeamId = winnerTeamId
+
+  let teamOneResult = 1
+  let teamTwoResult = 1
+
+  if (winnerTeamId === 1) {
+    teamTwoResult = 0
+  } else {
+    teamOneResult = 0
+  }
+
+  const avgTeamOneElo = getAverageTeamElo(game.teamOne)
+  const avgTeamTwoElo = getAverageTeamElo(game.teamTwo)
+
+  for (const player of game.teamOne) {
+    player.oldElo = player.elo.N
+    player.elo.N = getNewElo(parseInt(player.elo.N), avgTeamTwoElo, teamOneResult, parseInt(player.gamesWon.N) + parseInt(player.gamesLost.N))
+    player.gamesWon.N = (parseInt(player.gamesWon.N) + teamOneResult).toString()
+    player.gamesLost.N = (parseInt(player.gamesLost.N) + teamTwoResult).toString()
+  }
+
+  for (const player of game.teamTwo) {
+    player.oldElo = player.elo.N
+    player.elo.N = getNewElo(parseInt(player.elo.N), avgTeamOneElo, teamTwoResult, parseInt(player.gamesWon.N) + parseInt(player.gamesLost.N))
+    player.gamesWon.N = (parseInt(player.gamesWon.N) + teamTwoResult).toString()
+    player.gamesLost.N = (parseInt(player.gamesLost.N) + teamOneResult).toString()
+  }
+
+  // convert players in team in dict into one array of players
+  await updateElosAndGameCounts(input.dbclient, Object.values(game.teamOne).concat(Object.values(game.teamTwo)), input.interaction.guildId)
+  delete input.ongoingGames[gameId]
+
+  return input.interaction.reply(createResultMessage(game)).then(async () =>
+    setTimeout(async () => {
+      for (const channelId of [game.textID, game.voiceID, ...game.teamChannelIds]) {
+        const channel = await input.interaction.guild.channels.fetch(channelId)
+        await channel.delete()
+      }
+    }, 60000)
+  )
+}
+
+module.exports = { balanceTeams, createLobby, separatePlayers, getNewElo, setGameResult }

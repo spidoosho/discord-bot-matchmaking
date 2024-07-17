@@ -1,21 +1,13 @@
 exports.COUNT_PLAYERS_GAME = 2
+exports.CATEGORY_CHANNEL_TYPE = 4
+exports.VALORANT_QUEUE_CATEGORY_NAME = 'Valorant Queue Games'
+exports.COMMAND = 'command'
 exports.LEADERBOARD_TABLE_NAME = 'Leaderboard'
+exports.MAP_PREFERENCES_TABLE_NAME = 'MapPreferences'
+exports.MAPS_TABLE_NAME = 'Maps'
 exports.OFFLINE_STATUS = 'offline'
-exports.QUEUE_CHANNEL_ID = '1206970228203065365'
-exports.MESSAGE_QUEUE_ID = '1206981014208122891'
 exports.START_ELO = 1000
+exports.MAP_CHANGE_THRESHOLD = 0.5
 exports.TEAM_ONE = 'team_one'
 exports.TEAM_TWO = 'team_two'
-exports.TMP_IN_QUEUE_ID = '1082675580882911372'
-exports.TMP_GAME_CHANNEL_ID = '1084857427725394060'
 exports.ROLES = ['Duelist', 'Controller', 'Initiator', 'Sentinel', 'Flex']
-
-exports.LOTUS_EMOJI = '🪷'
-exports.PEARL_EMOJI = '🦪'
-exports.BIND_EMOJI = '⏳'
-exports.HAVEN_EMOJI = '☁️'
-exports.SPLIT_EMOJI = '🏗️'
-exports.FRACTURE_EMOJI = '🦴'
-exports.BREEZE_EMOJI = '🌬️'
-exports.ICEBOX_EMOJI = '🧊'
-exports.ASCENT_EMOJI = '🛫'

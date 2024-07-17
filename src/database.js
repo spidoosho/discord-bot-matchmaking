@@ -1,19 +1,20 @@
-const { ListTablesCommand, ScanCommand, UpdateItemCommand, GetItemCommand, TransactWriteItemsCommand, PutItemCommand } = require('@aws-sdk/client-dynamodb')
-const { LEADERBOARD_TABLE_NAME, START_ELO } = require('./constants.js')
+const { BatchGetItemCommand, ListTablesCommand, ScanCommand, UpdateItemCommand, GetItemCommand, TransactWriteItemsCommand, PutItemCommand, CreateTableCommand, DeleteTableCommand } = require('@aws-sdk/client-dynamodb')
+const { LEADERBOARD_TABLE_NAME, MAP_PREFERENCES_TABLE_NAME, MAPS_TABLE_NAME, START_ELO } = require('./constants.js')
 
 /**
  * Retrieves all items from leaderboard table
  *
  * @param   dbclient  Dynamo DB Client
+ * @param   guildId   guild id
  * @returns array of all items in Leaderboard table
  */
-async function getLeaderboard (dbclient) {
+async function getLeaderboard (dbclient, guildId) {
   function comparePlayers (a, b) {
     return parseInt(a.elo.N) - parseInt(b.elo.N)
   }
 
   const leaderboard = []
-  const input = { TableName: LEADERBOARD_TABLE_NAME }
+  const input = { TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}` }
   let scan = await dbclient.send(new ScanCommand(input))
 
   // if one scan is not enough, then scan until retrieved all items
@@ -35,29 +36,6 @@ async function getLeaderboard (dbclient) {
   }
 
   return leaderboard.sort(comparePlayers).reverse()
-}
-
-/**
- * Check if there is a table with name LEADERBOARD_TABLE_NAME in client database
- *
- * @param   dbclient  Dynamo DB Client
- * @returns if table exists
- */
-async function isLeaderboardTableFound (dbclient) {
-  let tables = await dbclient.send(new ListTablesCommand())
-
-  if (tables.TableNames.find(tableName => tableName === LEADERBOARD_TABLE_NAME)) {
-    return true
-  }
-
-  while (tables.LastEvaluatedTableName !== undefined) {
-    tables = await dbclient.send(new ListTablesCommand({ LastEvaluatedTableName: tables.LastEvaluatedTableName }))
-    if (tables.TableNames.find(tableName => tableName === LEADERBOARD_TABLE_NAME)) {
-      return true
-    }
-  }
-
-  return false
 }
 
 /**
@@ -125,12 +103,12 @@ async function updateItemById (dbclient, tableName, id, expressionAttributeNames
  * @param   players array of players data dictionary; reading id and updating elo
  * @returns true if response returns httpStatusCode 200
  */
-async function updateElosAndGameCounts (dbclient, players) {
+async function updateElosAndGameCounts (dbclient, players, guildId) {
   const updates = []
   for (const player of players) {
     const update = {
       Update: {
-        TableName: LEADERBOARD_TABLE_NAME,
+        TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}`,
         Key: { id: { N: player.id.N.toString() } },
         ExpressionAttributeNames: {
           '#E': 'elo',
@@ -163,9 +141,10 @@ async function updateElosAndGameCounts (dbclient, players) {
  *
  * @param   dbclient  Dynamo DB Client
  * @param   data player information dictionary
+ * @param   guildId guild id
  * @returns true if response returns httpStatusCode 200
  */
-async function addPlayerToDB (dbclient, data) {
+async function addPlayerToDB (dbclient, data, guildId) {
   if (data.id === undefined) {
     throw Error('id is not found in data')
   }
@@ -189,7 +168,7 @@ async function addPlayerToDB (dbclient, data) {
 
   const input = {
     Item: item,
-    TableName: LEADERBOARD_TABLE_NAME
+    TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}`
   }
 
   const response = await dbclient.send(new PutItemCommand(input))
@@ -205,14 +184,15 @@ async function addPlayerToDB (dbclient, data) {
  * Adds new player to database
  *
  * @param   dbclient  Dynamo DB Client
- * @param   id player id
+ * @param   userId player id
+ * @param   guildId guild id
  * @returns player data or undefined if player is not found in the database
  */
-async function getPlayerDataFromDb (dbclient, id) {
+async function getPlayerDataFromDb (dbclient, userId, guildId) {
   const input = {
-    TableName: LEADERBOARD_TABLE_NAME,
+    TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}`,
     Key: {
-      id: { N: id }
+      id: { N: userId }
     }
   }
 
@@ -225,4 +205,225 @@ async function getPlayerDataFromDb (dbclient, id) {
   return undefined
 }
 
-module.exports = { getLeaderboard, isLeaderboardTableFound, getItemById, updateElosAndGameCounts, updateItemById, addPlayerToDB, getPlayerDataFromDb }
+async function getMaps (dbclient) {
+  const maps = []
+  const input = { TableName: MAPS_TABLE_NAME }
+  let scan = await dbclient.send(new ScanCommand(input))
+
+  // if one scan is not enough, then scan until retrieved all items
+  // if LastEvaluatedKey is undefined, then all items have been retrieved
+  while (scan.LastEvaluatedKey !== undefined) {
+    // LastEvaluatedKey is defined, ergo scan found items
+    scan.Items.forEach(function (item, index) {
+      maps.push({ Name: item.Name.S, id: parseInt(item.id.N) })
+    })
+
+    input.ExclusiveStartKey = scan.LastEvaluatedKey
+    scan = await dbclient.send(new ScanCommand(input))
+  }
+
+  if (scan.Items !== undefined) {
+    scan.Items.forEach(function (item, index) {
+      maps.push({ Name: item.Name.S, id: parseInt(item.id.N) })
+    })
+  }
+
+  return maps
+}
+
+async function getPlayerMapPreferences (dbclient, id, guildId) {
+  const input = {
+    TableName: `${MAP_PREFERENCES_TABLE_NAME}_${guildId}`,
+    Key: {
+      id: { N: id }
+    }
+  }
+
+  const response = await dbclient.send(new GetItemCommand(input))
+
+  if (response.Item === undefined) {
+    return undefined
+  }
+
+  const maps = {}
+  for (const [key, value] of Object.entries(response.Item)) {
+    maps[parseInt(key)] = { Value: parseFloat(value.N) }
+  }
+
+  return maps
+}
+
+async function getPlayersMapsPreferences (dbclient, ids, guildId) {
+  const keys = ids.map(id => ({
+    id: { N: id }
+  }))
+
+  // Create the BatchGetItemCommand input
+  const input = {
+    RequestItems: {
+      [`${MAP_PREFERENCES_TABLE_NAME}_${guildId}`]: {
+        Keys: keys
+      }
+    }
+  }
+
+  const command = new BatchGetItemCommand(input)
+  const response = await dbclient.send(command)
+  const result = {}
+  for (const player of response.Responses[`${MAP_PREFERENCES_TABLE_NAME}_${guildId}`]) {
+    const playerArr = []
+    for (let i = 0; i < Object.keys(player).length - 1; i++) {
+      playerArr.push(parseFloat(player[i].N))
+    }
+    result[player.id.N] = playerArr
+  }
+
+  return result
+}
+
+async function getMapNames (dbclient, ids) {
+  const keys = ids.map(id => ({
+    id: { N: id.toString() }
+  }))
+
+  // Create the BatchGetItemCommand input
+  const input = {
+    RequestItems: {
+      [MAPS_TABLE_NAME]: {
+        Keys: keys
+      }
+    }
+  }
+
+  const response = await dbclient.send(new BatchGetItemCommand(input))
+  const result = []
+
+  for (const mapDict of response.Responses[MAPS_TABLE_NAME]) {
+    result.push({ id: parseInt(mapDict.id.N), Name: mapDict.Name.S })
+  }
+
+  return result
+}
+
+async function resetMapPreference (input) {
+  // params - interaction, dbclient, value
+  const ExprAttrNames = {
+    '#M': input.values[1].toString()
+  }
+  const ExprAttrValues = {
+    ':m': { N: input.values[2].toString() }
+  }
+  const UpdateExpression = 'SET #M=:m'
+
+  const updated = await updateItemById(input.dbclient, `${MAP_PREFERENCES_TABLE_NAME}_${input.interaction.guildId}`, input.interaction.user.id, ExprAttrNames, ExprAttrValues, UpdateExpression)
+
+  if (updated) {
+    return `${input.values[0]} preference updated to ${input.values[2]} successfully.`
+  } else {
+    return `${input.values[0]} preference updated unsuccessfully.`
+  }
+}
+
+async function removeTable (dbclient, tableName) {
+  const input = {
+    TableName: tableName
+  }
+
+  const command = new DeleteTableCommand(input)
+  await dbclient.send(command)
+}
+
+async function createTable (dbclient, tableName) {
+  const input = {
+    AttributeDefinitions: [
+      {
+        AttributeName: 'id',
+        AttributeType: 'N'
+      }
+    ],
+    KeySchema: [
+      {
+        AttributeName: 'id',
+        KeyType: 'HASH'
+      }
+    ],
+    ProvisionedThroughput: {
+      ReadCapacityUnits: 1,
+      WriteCapacityUnits: 1
+    },
+    TableName: tableName
+  }
+
+  const command = new CreateTableCommand(input)
+  await dbclient.send(command)
+}
+
+async function removeGuildTables (dbclient, guildId) {
+  const tables = await dbclient.send(new ListTablesCommand())
+
+  for (const tableName of tables.TableNames) {
+    if (tableName.includes(LEADERBOARD_TABLE_NAME) && tableName.includes(guildId)) {
+      await removeTable(dbclient, tableName)
+    } else if (tableName.includes(MAP_PREFERENCES_TABLE_NAME) && tableName.includes(guildId)) {
+      await removeTable(dbclient, tableName)
+    }
+  }
+}
+
+async function createOrClearGuildTables (dbclient, guildId) {
+  const tables = await dbclient.send(new ListTablesCommand())
+  let leadeboardTableName
+  let mapPreferencesTableName
+
+  for (const tableName of tables.TableNames) {
+    if (tableName.includes(LEADERBOARD_TABLE_NAME) && tableName.includes(guildId)) {
+      await removeTable(dbclient, tableName)
+      leadeboardTableName = `${LEADERBOARD_TABLE_NAME}_${guildId}`
+      await createTable(dbclient, leadeboardTableName)
+    } else if (tableName.includes(MAP_PREFERENCES_TABLE_NAME) && tableName.includes(guildId)) {
+      await removeTable(dbclient, tableName)
+      mapPreferencesTableName = `${MAP_PREFERENCES_TABLE_NAME}_${guildId}`
+      await createTable(dbclient, mapPreferencesTableName)
+    }
+  }
+
+  if (leadeboardTableName === undefined) {
+    await createTable(dbclient, `${LEADERBOARD_TABLE_NAME}_${guildId}`)
+  }
+
+  if (mapPreferencesTableName === undefined) {
+    await createTable(dbclient, `${MAP_PREFERENCES_TABLE_NAME}_${guildId}`)
+  }
+}
+
+async function updateMapPreference (input) {
+  const playerMapPreferences = await getPlayerMapPreferences(input.dbclient, input.interaction.user.id, input.interaction.guild.id)
+  input.values[2] = (parseFloat(input.values[2]) + playerMapPreferences[input.values[1]].Value) / 2
+  return resetMapPreference(input)
+}
+
+async function checkForGuildTables (dbclient, guildIds) {
+  const tables = await dbclient.send(new ListTablesCommand())
+
+  for (const guildId of guildIds) {
+    let leadeboardTableFound = false
+    let mapPreferencesTableFound = false
+    for (const tableName of tables.TableNames) {
+      if (!leadeboardTableFound && tableName.includes(LEADERBOARD_TABLE_NAME) && tableName.includes(guildId)) {
+        leadeboardTableFound = true
+      } else if (!mapPreferencesTableFound && tableName.includes(MAP_PREFERENCES_TABLE_NAME) && tableName.includes(guildId)) {
+        mapPreferencesTableFound = true
+      }
+    }
+
+    if (!leadeboardTableFound) {
+      await createTable(dbclient, `${LEADERBOARD_TABLE_NAME}_${guildId}`)
+    }
+
+    if (!mapPreferencesTableFound) {
+      await createTable(dbclient, `${MAP_PREFERENCES_TABLE_NAME}_${guildId}`)
+    }
+  }
+}
+
+module.exports = { getLeaderboard, getItemById, updateElosAndGameCounts, updateItemById, addPlayerToDB, getPlayerDataFromDb, getPlayersMapsPreferences, getPlayerMapPreferences, getMaps, resetMapPreference, updateMapPreference, getMapNames, createOrClearGuildTables, removeGuildTables, checkForGuildTables }

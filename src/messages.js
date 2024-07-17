@@ -1,23 +1,23 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js')
-const { QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID } = require('./constants.js')
+const { QUEUE_CHANNEL_ID } = require('./constants.js')
 const { getNumberStrWithOperand } = require('./utils.js')
+const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js')
 
 function createQueueMessage (wasSuccessful) {
   // add button to dequeue to the message
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId('dequeue')
+        .setCustomId('command_dequeue')
         .setLabel('Leave the queue')
         .setStyle(ButtonStyle.Primary)
     )
 
-  let message = '(This message will be deleted after 1 minute)'
-
+  let message
   if (wasSuccessful) {
-    message = `You have joined the queue. ${message}`
+    message = 'You have joined the queue.'
   } else {
-    message = `You are already in queue! ${message}`
+    message = 'You are already in queue!'
   }
 
   return { content: message, components: [row], ephemeral: true }
@@ -25,18 +25,17 @@ function createQueueMessage (wasSuccessful) {
 
 function createDequeueMessage (wasSuccessful) {
   // add button to queue to the message
-  let message = '(This message will be deleted after 1 minute)'
-
+  let message
   if (wasSuccessful) {
-    message = `You have been dequeued. ${message}`
+    message = 'You have been dequeued.'
   } else {
-    message = `You are not in queue! ${message}`
+    message = 'You are not in queue!'
   }
 
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId('queue')
+        .setCustomId('command_queue')
         .setLabel('Join the queue')
         .setStyle(ButtonStyle.Primary)
     )
@@ -57,7 +56,7 @@ function createAutoDequeueMessage (userId) {
   return { content: message, components: [row], ephemeral: true }
 }
 
-function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName) {
+function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName, selectedMap) {
   let teamOne = `<@${teams.teamOne[0].id.N}>`
   let teamTwo = `<@${teams.teamTwo[0].id.N}>`
 
@@ -82,7 +81,7 @@ function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName) {
 
   const embed = new EmbedBuilder()
     .setColor(0x0099FF)
-    .setTitle('The game is ready!')
+    .setTitle(`The game is ready. Chosen map is ${selectedMap}!`)
     .setDescription('After the game please submit the winner')
     .addFields(
       { name: teamOneName, value: teamOne, inline: true },
@@ -91,25 +90,6 @@ function createTeamsMessage (textChannelId, teams, teamOneName, teamTwoName) {
     .setTimestamp()
 
   return { embeds: [embed], components: [row] }
-}
-
-async function updatePinnedQueueMessage (count, connection) {
-  const title = `Currently in queue: ${count}`
-  const exampleEmbed = new EmbedBuilder()
-    .setColor(0x0099FF)
-    .setTitle(title)
-    .setTimestamp()
-
-  let queueChannel
-  if ('interaction' in connection) {
-    queueChannel = await connection.interaction.guild.channels.fetch(QUEUE_CHANNEL_ID)
-  } else if ('client' in connection) {
-    queueChannel = await connection.client.channels.fetch(QUEUE_CHANNEL_ID)
-  } else {
-    throw new Error('interaction or client must be provided')
-  }
-  const message = await queueChannel.messages.fetch(MESSAGE_QUEUE_ID)
-  await message.edit({ content: '', embeds: [exampleEmbed] })
 }
 
 async function setPinnedQueueMessage (client, count) {
@@ -137,23 +117,44 @@ async function setPinnedQueueMessage (client, count) {
   await queueChannel.send({ content: '', embeds: [exampleEmbed], components: [row] })
 }
 
+function createSelectMapMessage (maps, channelId) {
+  const embed = new EmbedBuilder()
+    .setColor(0x0099FF)
+    .setTitle('Select map to play before joining voice channel.')
+
+  const row = new ActionRowBuilder()
+
+  for (const map of maps) {
+    row.addComponents(
+      new ButtonBuilder()
+        .setCustomId(`chosenmap_${channelId}_${map.id}`)
+        .setLabel(`${map.Name}`)
+        .setStyle(ButtonStyle.Primary)
+    )
+  }
+
+  return { embeds: [embed], components: [row] }
+}
+
 function createResultMessage (game) {
-  let teamOne = `<@${game.teamOne[0].id.N}>: ${game.teamOne[0].elo.N} (${getNumberStrWithOperand(game.teamOne[0].oldElo - game.teamOne[0].elo.N)})`
-  let teamTwo = `<@${game.teamTwo[0].id.N}>: ${game.teamTwo[0].elo.N} (${getNumberStrWithOperand(game.teamTwo[0].oldElo - game.teamTwo[0].elo.N)})`
+  let teamOne = `<@${game.teamOne[0].id.N}>: ${game.teamOne[0].elo.N} (${getNumberStrWithOperand(game.teamOne[0].elo.N - game.teamOne[0].oldElo)})`
+  let teamTwo = `<@${game.teamTwo[0].id.N}>: ${game.teamTwo[0].elo.N} (${getNumberStrWithOperand(game.teamTwo[0].elo.N - game.teamTwo[0].oldElo)})`
 
   for (let i = 1; i < game.teamOne.length; i++) {
-    teamOne += `\n<@${game.teamOne[i].id.N}>: ${game.teamOne[i].elo.N} (${getNumberStrWithOperand(game.teamOne[i].oldElo - game.teamOne[i].elo.N)})`
-    teamTwo += `\n<@${game.teamTwo[i].id.N}>: ${game.teamTwo[i].elo.N} (${getNumberStrWithOperand(game.teamTwo[i].oldElo - game.teamTwo[i].elo.N)})`
+    teamOne += `\n<@${game.teamOne[i].id.N}>: ${game.teamOne[i].elo.N} (${getNumberStrWithOperand(game.teamOne[i].elo.N - game.teamOne[i].oldElo)})`
+    teamTwo += `\n<@${game.teamTwo[i].id.N}>: ${game.teamTwo[i].elo.N} (${getNumberStrWithOperand(game.teamTwo[i].elo.N - game.teamTwo[i].oldElo)})`
   }
 
   const row = new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId('queue')
+        .setCustomId('command_queue')
         .setLabel('Join the queue')
         .setStyle(ButtonStyle.Primary)
     )
 
+  game.map.Name.S = game.map.Name
+  const updatePreferenceComponent = createMenuSelectRow(game.map, 'updatemappreference')
   const embed = new EmbedBuilder()
     .setColor(0x0099FF)
     .setTitle(`${game.teamNames[game.winnerTeamId - 1]} wins!`)
@@ -164,7 +165,46 @@ function createResultMessage (game) {
     )
     .setTimestamp()
 
-  return { content: 'Game channels will be deleted in 1 minute.', embeds: [embed], components: [row] }
+  return { content: 'Game channels will be deleted in 1 minute.', embeds: [embed], components: [row, updatePreferenceComponent] }
+}
+
+function createMenuSelectRow (map, customId) {
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(`${customId}_${map.Name}`)
+    .setPlaceholder(`Select your map preference for ${map.Name}`)
+
+  for (let i = 1; i <= 10; i++) {
+    select.addOptions(new StringSelectMenuOptionBuilder()
+      .setLabel(`${i}`)
+      .setValue(`${map.id}_${i}`)
+    )
+  }
+  return new ActionRowBuilder().addComponents(select)
+}
+
+function createResetMapsMessages (maps) {
+  const rows = []
+  let row = []
+
+  for (const map of maps) {
+    row.push(createMenuSelectRow(map, 'resetmappreference'))
+    if (row.length >= 5) {
+      rows.push(row)
+      row = []
+    }
+  }
+
+  if (row.length > 0) {
+    rows.push(row)
+  }
+
+  const result = []
+
+  for (const split of rows) {
+    result.push({ components: split, ephemeral: true })
+  }
+
+  return result
 }
 
 function createLeaderboardMessage (leaderboard) {
@@ -194,6 +234,14 @@ function createMessageAboutPlayer (playerData) {
     streamLink = playerData.streamUrl
   }
 
+  let maps = ''
+  for (const value of Object.values(playerData.mapPreferences)) {
+    if (value.Name !== undefined) {
+      maps += `${value.Name}: ${value.Value}, `
+    }
+  }
+  maps = maps.slice(0, -2)
+
   const embed = new EmbedBuilder()
     .setColor(0x0099FF)
     .setTitle('Data about you')
@@ -201,11 +249,12 @@ function createMessageAboutPlayer (playerData) {
       { name: 'Elo', value: playerData.elo.N, inline: true },
       { name: 'Score', value: `(${playerData.gamesWon.N}:${playerData.gamesLost.N})`, inline: true },
       { name: 'Twitter handle', value: twitterHandle, inline: true },
-      { name: 'Stream link', value: streamLink, inline: true }
+      { name: 'Stream link', value: streamLink, inline: true },
+      { name: 'Map preferences', value: maps }
     )
     .setTimestamp()
 
   return { embeds: [embed], ephemeral: true }
 }
 
-module.exports = { createDequeueMessage, createAutoDequeueMessage, createTeamsMessage, createQueueMessage, updatePinnedQueueMessage, setPinnedQueueMessage, createResultMessage, createLeaderboardMessage, createMessageAboutPlayer }
+module.exports = { createDequeueMessage, createAutoDequeueMessage, createTeamsMessage, createQueueMessage, setPinnedQueueMessage, createResultMessage, createLeaderboardMessage, createMessageAboutPlayer, createResetMapsMessages, createSelectMapMessage }

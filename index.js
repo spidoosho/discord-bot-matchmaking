@@ -3,11 +3,12 @@ const path = require('node:path')
 const { Client, Collection, Events, GatewayIntentBits, InteractionType } = require('discord.js')
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb')
 const { REST, Routes } = require('discord.js')
-const { COUNT_PLAYERS_GAME, OFFLINE_STATUS } = require('./src/constants.js')
-const { isQueueInVoice, splitCommand } = require('./src/utils.js')
-const { separatePlayers } = require('./src/game.js')
+const { COUNT_PLAYERS_GAME, OFFLINE_STATUS, COMMAND } = require('./src/constants.js')
+const { isQueueInVoice, splitCommand, addVoteForMap, selectMap } = require('./src/utils.js')
+const { separatePlayers, setGameResult } = require('./src/game.js')
 const { tweet } = require('./src/twitter.js')
-const { updatePinnedQueueMessage, createAutoDequeueMessage } = require('./src/messages.js')
+const { resetMapPreference, updateMapPreference, createOrClearGuildTables, removeGuildTables, checkForGuildTables } = require('./src/database.js')
+const { createAutoDequeueMessage } = require('./src/messages.js')
 require('dotenv').config()
 
 const playersInQueue = {}
@@ -18,11 +19,34 @@ const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBit
 const dbclient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION })
 
 client.once(Events.ClientReady, async () => {
+  /*
   await tweet({
     teamOne: [{ twitterHandle: '@spidooosha' }],
     teamTwo: [{ displayName: 'noob' }]
   }, ['team-spidooosha', 'team-noob'])
+  */
+  const guildIds = []
+  for (const guild of client.guilds.cache) {
+    guildIds.push(guild[0])
+  }
+  await checkForGuildTables(dbclient, guildIds)
   console.debug('Ready!')
+})
+
+/**
+ * Emitted whenever this discord bot is added to a new Discord server.
+ * Creates or clears tables if tables already existed.
+ */
+client.on('guildCreate', async (guild) => {
+  await createOrClearGuildTables(dbclient, guild.id)
+})
+
+/**
+ * Emitted whenever this discord bot leaves a Discord server.
+ * Deletes tables associated with this guild.
+ */
+client.on('guildDelete', async (guild) => {
+  await removeGuildTables(dbclient, guild.id)
 })
 
 /**
@@ -37,7 +61,6 @@ client.on('presenceUpdate', async (_, newMember) => {
     // remove from queue
     delete playersInQueue[newMember.userId]
 
-    await updatePinnedQueueMessage(Object.keys(playersInQueue).length, { client })
     await newMember.user.send(createAutoDequeueMessage(newMember.userId))
   }
 })
@@ -56,15 +79,18 @@ client.on('voiceStateUpdate', async (_, newMember) => {
     if (channel.members.size >= COUNT_PLAYERS_GAME) {
       // check for correct players
       const playerIds = Object.keys(lobbyVoiceChannels[newMember.channelId].players)
-      if (isQueueInVoice(playerIds, channel.members)) {
-        // start match
-        lobbyVoiceChannels[newMember.channelId].voiceID = newMember.channelId
-        lobbyVoiceChannels[newMember.channelId].guild = newMember.guild
-
-        const game = await separatePlayers(lobbyVoiceChannels[newMember.channelId])
-        ongoingGames[game.id] = game.gameInfo
-
+      if (isQueueInVoice(playerIds, channel.members) && newMember.channelId in lobbyVoiceChannels) {
+        // remove lobby
+        const voiceChannel = lobbyVoiceChannels[newMember.channelId]
         delete lobbyVoiceChannels[newMember.channelId]
+
+        // start match
+        voiceChannel.voiceID = newMember.channelId
+        voiceChannel.guild = newMember.guild
+
+        const map = selectMap(voiceChannel.maps)
+        const game = await separatePlayers(voiceChannel, map)
+        ongoingGames[game.id] = game.gameInfo
       }
     }
   }
@@ -80,10 +106,17 @@ client.on(Events.InteractionCreate, async interaction => {
   let flagAndParams
 
   if (!interaction.isChatInputCommand()) {
-    // button interaction has customID with command to call
+    // custom interaction with customID
     if (interaction.type === InteractionType.MessageComponent) {
       flagAndParams = splitCommand(interaction.customId)
-      command = client.commands.get(flagAndParams.flag)
+      if (flagAndParams.flag === COMMAND) {
+        // button interaction is a command
+        command = client.commands.get(flagAndParams.params[0])
+        flagAndParams.flag = flagAndParams.params[0]
+      }
+      if (interaction.values !== undefined && interaction.values.length > 0) {
+        flagAndParams.params = flagAndParams.params.concat(interaction.values[0].split('_'))
+      }
     }
   } else {
     // command interaction
@@ -91,14 +124,39 @@ client.on(Events.InteractionCreate, async interaction => {
     command = client.commands.get(flagAndParams.flag)
   }
 
-  if (!command) return
+  if (!command) {
+    // custom interaction
+    let message = 'Done'
+    let messageSent = false
+    switch (flagAndParams.flag) {
+      case 'resetmappreference':
+        message = await resetMapPreference({ interaction, dbclient, values: flagAndParams.params })
+        break
+      case 'updatemappreference':
+        message = await updateMapPreference({ interaction, dbclient, values: flagAndParams.params })
+        break
+      case 'setgameresult':
+        await setGameResult({ interaction, params: flagAndParams.params, dbclient, ongoingGames, playersInQueue })
+        messageSent = true
+        break
+      case 'chosenmap':
+        message = addVoteForMap({ interaction, params: flagAndParams.params, lobbyVoiceChannels })
+        break
+    }
+
+    if (!messageSent) {
+      await interaction.reply({ content: message, ephemeral: true })
+    }
+
+    return
+  }
 
   try {
+    // command interaction
     switch (flagAndParams.flag) {
       case 'queue':
       case 'dequeue':
         await command.execute({ interaction, playersInQueue, lobbyVoiceChannels, dbclient })
-        await updatePinnedQueueMessage(Object.keys(playersInQueue).length, { interaction })
         break
       case 'list':
         await command.execute({ interaction, playersInQueue })
@@ -112,10 +170,8 @@ client.on(Events.InteractionCreate, async interaction => {
       case 'leaderboard':
         await command.execute({ interaction, dbclient })
         break
-      case 'sub':
-        break
-      case 'setgameresult':
-        await command.execute({ interaction, params: flagAndParams.params, dbclient, ongoingGames, playersInQueue })
+      case 'resetmapspreferences':
+        await command.execute({ interaction, dbclient })
         break
       case 'me':
         await command.execute({ interaction, dbclient })
@@ -148,15 +204,13 @@ for (const file of commandFiles) {
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 // deploy commands
+
 (async () => {
   try {
     console.log(`Started refreshing ${commands.length} application (/) commands.`)
 
     // The put method is used to fully refresh all commands in the guild with the current set
-    const data = await rest.put(
-      Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
-      { body: commands }
-    )
+    const data = await rest.put(Routes.applicationCommands(process.env.DISCORD_CLIENT_ID), { body: commands })
 
     console.log(`Successfully reloaded ${data.length} application (/) commands.`)
   } catch (error) {

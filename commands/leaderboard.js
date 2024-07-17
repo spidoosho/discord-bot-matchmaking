@@ -9,6 +9,6 @@ module.exports = {
   async execute (input) {
     console.log('[DEBUG]: Executing leaderboard')
 
-    return input.interaction.reply(createLeaderboardMessage(await getLeaderboard(input.dbclient)))
+    return input.interaction.reply(createLeaderboardMessage(await getLeaderboard(input.dbclient, input.interaction.guildId)))
   }
 }
