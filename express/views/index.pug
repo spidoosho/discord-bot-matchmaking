@@ -1,0 +1,14 @@
+html
+  body
+      table(style='width:100%', border='1')
+        tr
+          th Username
+          th Elo
+          th Games won
+          th Games lost
+        each player in leaderboard
+          tr
+            td #{player.displayName.S}
+            td #{player.elo.N}
+            td #{player.gamesWon.N}
+            td #{player.gamesLost.N}

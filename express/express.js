@@ -1,3 +1,5 @@
+const path = require('node:path')
+
 function startExpress () {
 // Import packages
   const express = require('express')
@@ -9,6 +11,7 @@ function startExpress () {
   // Middlewares
   const app = express()
   app.set('view engine', 'pug')
+  app.set('views', path.join(__dirname, './views'))
 
   app.use(express.json())
 

@@ -8,6 +8,14 @@ const dbclient = getClient()
 /**
  * Sends a JSON response with an array of players' data sorted in descending rating order
  */
+router.get('/:id', async function (req, res) {
+  const leaderboard = await getLeaderboardFromDB(dbclient, req.params.id)
+  res.render('index', { leaderboard })
+})
+
+/**
+ * Sends a JSON response with an array of players' data sorted in descending rating order
+ */
 router.get('/leaderboard/:id', async function (req, res) {
   const leaderboard = await getLeaderboardFromDB(dbclient, req.params.id)
   res.json(leaderboard)

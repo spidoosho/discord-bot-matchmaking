@@ -71,6 +71,14 @@ If you want to add Fossabot commands with the bot data, then:
   
     ```$(eval $(urlfetch discord-bot-matchmaking.onrender.com/DISCORD_SERVER_ID/DISCORD_USER_ID/text))```
 
+## Leaderboard website
+
+You can find your leaderboard website using your Discord server ID ([Guide above]([displayName](https://github.com/spiduso/discord-bot-matchmaking/tree/main/documentations/user_documentation#adding-bot-data-to-your-twitch-stream-using-fossabot))). Replace `DISCORD_SERVER_ID` with the server ID:
+
+```
+https://discord-bot-matchmaking.onrender.com/DISCORD_SERVER_ID
+```
+
 ## Advanced options
 
 If you want to add something else to the Discord bot, you can edit the Discord bot! Guide is in the [developer documentation](https://github.com/spiduso/discord-bot-matchmaking/blob/main/documentations/developer_documentation/README.md).

@@ -1,16 +1,20 @@
-<table border="1" cellpadding="2" style="width: 25%;">
-    <tbody> 
-       <tr> 
-          <th scope="col"> Fiscal </th> 
-          <th scope="col"> Courses </th> 
-          <th scope="col"> Cost </th> 
-          <th scope="col"> Comment </th> 
-       </tr> 
-       <tr> 
-          <td align="center"> 2019-20</td>
-          <td align="center" id="Icount">252</td>
-          <td align="center" id="SumPrices">323662</td>
-          <td align="center"> Something </td>
-       </tr>
-    </tbody> 
-  </table> 
+html
+  body
+      table(style='width:100%', border='1')
+        tr
+          th Datum
+          th Nazev
+          th Mnozstvi
+          th Objednavka
+        each obj in objednavky
+          tr
+            td #{obj.Datum}
+            td #{obj.Nazev}
+            td #{obj.Mnozstvi}
+            td #{obj.Objednavka}
+        tr 
+          td Suma
+          td
+          td #{sum} kg
+          td
+p poslední aktualizace #{lastUpdate}
