@@ -6,7 +6,6 @@ const { REST, Routes } = require('discord.js')
 const { COUNT_PLAYERS_GAME, OFFLINE_STATUS, COMMAND } = require('./src/constants.js')
 const { isQueueInVoice, splitCommand, addVoteForMap, selectMap } = require('./src/utils.js')
 const { separatePlayers, setGameResult } = require('./src/game.js')
-const { tweet } = require('./src/twitter.js')
 const { resetMapPreference, updateMapPreference, createOrClearGuildTables, removeGuildTables, checkForGuildTables } = require('./src/database.js')
 const { createAutoDequeueMessage } = require('./src/messages.js')
 require('dotenv').config()
@@ -16,7 +15,7 @@ const lobbyVoiceChannels = {}
 const ongoingGames = {}
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildPresences] })
-const dbclient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION })
+const dbclient = new DynamoDBClient({ region: process.env.DYNAMODB_REGION, credentials: { accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID, secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY } })
 
 client.once(Events.ClientReady, async () => {
   /*
