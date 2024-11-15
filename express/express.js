@@ -19,8 +19,8 @@ function startExpress() {
 	app.use(bodyParser.json());
 
 	// Routes
-	app.use('/', leaderboard);
-	app.use('/', player);
+	app.use('/leaderboard', leaderboard);
+	app.use('/player', player);
 	app.use('/', home);
 
 	// Connection

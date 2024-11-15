@@ -1,13 +1,13 @@
-const { DynamoDBClient, ListTablesCommand } = require('@aws-sdk/client-dynamodb')
-const { ScanCommand } = require('@aws-sdk/client-dynamodb')
-const { LEADERBOARD_TABLE_NAME } = require('./constants.js')
+const { DynamoDBClient, ListTablesCommand, ResourceNotFoundException } = require('@aws-sdk/client-dynamodb');
+const { ScanCommand } = require('@aws-sdk/client-dynamodb');
+const { LEADERBOARD_TABLE_NAME } = require('./constants.js');
 
 /**
  * Creates a new DynamoDBClient with secrets in .env
  * @returns {DynamoDBClient}
  */
-function getClient () {
-  return new DynamoDBClient({ region: process.env.DYNAMODB_REGION, credentials: { accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID, secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY } })
+function getClient() {
+	return new DynamoDBClient({ region: process.env.DYNAMODB_REGION, credentials: { accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID, secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY } });
 }
 
 /**
@@ -15,40 +15,51 @@ function getClient () {
  * @param {DynamoDBClient} dbclient DynamoDB client
  * @returns {Promise<[Object.<string, string>]>}
  */
-async function getLeaderboardFromDB (dbclient, guildId) {
-  /**
+async function getLeaderboardFromDB(dbclient, guildId) {
+	/**
    * Custom method for sorting players based on their rating
    * @param {Object.<string, string>} first player dictionary
    * @param {Object.<string, string>} second player dictionary
    * @returns {number} difference of elo
    */
-  function comparePlayers (first, second) {
-    return parseInt(first.elo.N) - parseInt(second.elo.N)
-  }
+	function comparePlayers(first, second) {
+		return parseInt(first.elo.N) - parseInt(second.elo.N);
+	}
 
-  const leaderboard = []
-  const input = { TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}`, ProjectionExpression: 'displayName, elo, gamesWon, gamesLost' }
-  let scan = await dbclient.send(new ScanCommand(input))
+	const leaderboard = [];
+	const input = { TableName: `${LEADERBOARD_TABLE_NAME}_${guildId}`, ProjectionExpression: 'displayName, elo, gamesWon, gamesLost' };
+	let scan = undefined;
 
-  // if one scan is not enough, then scan until retrieved all items
-  // if LastEvaluatedKey is undefined, then all items have been retrieved
-  while (scan.LastEvaluatedKey !== undefined) {
-    // LastEvaluatedKey is defined, ergo scan found items
-    scan.Items.forEach(function (item, index) {
-      leaderboard.push(item)
-    })
+	try {
+		scan = await dbclient.send(new ScanCommand(input));
+	}
+	catch (error) {
+		if (error.name === ResourceNotFoundException.name) {
+			console.log(error.$metadata);
+		}
+	}
 
-    input.ExclusiveStartKey = scan.LastEvaluatedKey
-    scan = await dbclient.send(new ScanCommand(input))
-  }
+	if (scan === undefined) return null;
 
-  if (scan.Items !== undefined) {
-    scan.Items.forEach(function (item, index) {
-      leaderboard.push(item)
-    })
-  }
+	// if one scan is not enough, then scan until retrieved all items
+	// if LastEvaluatedKey is undefined, then all items have been retrieved
+	while (scan.LastEvaluatedKey !== undefined) {
+		// LastEvaluatedKey is defined, ergo scan found items
+		scan.Items.forEach(function(item, index) {
+			leaderboard.push(item);
+		});
 
-  return leaderboard.sort(comparePlayers).reverse()
+		input.ExclusiveStartKey = scan.LastEvaluatedKey;
+		scan = await dbclient.send(new ScanCommand(input));
+	}
+
+	if (scan.Items !== undefined) {
+		scan.Items.forEach(function(item, index) {
+			leaderboard.push(item);
+		});
+	}
+
+	return leaderboard.sort(comparePlayers).reverse();
 }
 
 /**
@@ -57,14 +68,14 @@ async function getLeaderboardFromDB (dbclient, guildId) {
  * @param   {DynamoDBClient} dbclient  Dynamo DB Client
  * @returns {Promise<boolean>} if table exists
  */
-async function canRetrieveTables (dbclient) {
-  const tables = await dbclient.send(new ListTablesCommand())
+async function canRetrieveTables(dbclient) {
+	const tables = await dbclient.send(new ListTablesCommand());
 
-  if (tables.$metadata.httpStatusCode === 200) {
-    return true
-  }
+	if (tables.$metadata.httpStatusCode === 200) {
+		return true;
+	}
 
-  return false
+	return false;
 }
 
-module.exports = { getClient, getLeaderboardFromDB, canRetrieveTables }
+module.exports = { getClient, getLeaderboardFromDB, canRetrieveTables };
