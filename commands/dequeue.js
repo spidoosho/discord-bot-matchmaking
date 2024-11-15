@@ -1,19 +1,20 @@
-const { SlashCommandBuilder } = require('discord.js')
-const { createDequeueMessage } = require('../src/messages.js')
+const { SlashCommandBuilder } = require('discord.js');
+const { createDequeueMessage } = require('../src/messages.js');
 
 module.exports = {
-  data: new SlashCommandBuilder()
-    .setName('dequeue')
-    .setDescription('Remove from the queue.'),
-  async execute (input) {
-    console.log('[DEBUG]: executing dequeue')
+	data: new SlashCommandBuilder()
+		.setName('dequeue')
+		.setDescription('Remove from the queue.'),
+	async execute(interaction, playersInQueue) {
+		console.log('[DEBUG]: executing dequeue');
 
-    const isUserInQueue = input.interaction.user.id in input.playersInQueue
+		const isUserInQueue = playersInQueue.isPlayerInQueue(interaction.user.id);
+		console.log(isUserInQueue);
+		console.log(playersInQueue.queue);
+		if (isUserInQueue) {
+			delete playersInQueue.removePlayer(interaction.user.id);
+		}
 
-    if (isUserInQueue) {
-      delete input.playersInQueue[input.interaction.user.id]
-    }
-
-    return input.interaction.reply(createDequeueMessage(isUserInQueue))
-  }
-}
+		return interaction.reply(createDequeueMessage(isUserInQueue));
+	},
+};
