@@ -231,7 +231,7 @@ function balanceTeams(queue) {
 
 function getNewElo(playerElo, opponentElo, actualScore, gamesPlayed) {
 	// newElo = oldElo + K * (actualScore - expectedScore)
-	// expectedScore = 1/(1+10^((playerElo - opponentElo)/400)
+	// expectedScore = 1/(1+10^((opponentElo - playerElo)/400)
 	// K = 800 / (50 + gamesPlayed)
 	const expectedScore = 1 / (1 + Math.pow(10, (opponentElo - playerElo) / 400));
 	const K = 800 / (50 + gamesPlayed);
@@ -302,12 +302,24 @@ async function separatePlayers(gameInfo, selectedMap) {
 	return { id: textChannel.id, gameInfo };
 }
 
-async function setGameResult(input) {
-	const buttonData = input.interaction.customId.split('_');
+function checkIfPlayerSetGameResult(ongoingGames, gameId, userId) {
+	if (!(gameId in ongoingGames)) return false;
+
+	const game = ongoingGames[gameId];
+
+	return game.teamOne.includes(userId) || game.teamTwo.includes(userId);
+}
+
+async function setGameResult(interaction, ongoingGames, dbclient) {
+	const buttonData = interaction.customId.split('_');
 	const gameId = buttonData[1];
 	const winnerTeamId = parseInt(buttonData[2]);
 
-	const game = input.ongoingGames[gameId];
+	if (!checkIfPlayerSetGameResult(ongoingGames, gameId, interaction.member.id)) {
+		return interaction.reply({ content: 'Only players from the game can set game result!', ephemeral: true });
+	}
+
+	const game = ongoingGames[gameId];
 	game.winnerTeamId = winnerTeamId;
 
 	let teamOneResult = 1;
@@ -338,13 +350,13 @@ async function setGameResult(input) {
 	}
 
 	// convert players in team in dict into one array of players
-	await updateElosAndGameCounts(input.dbclient, Object.values(game.teamOne).concat(Object.values(game.teamTwo)), input.interaction.guildId);
-	delete input.ongoingGames[gameId];
+	await updateElosAndGameCounts(dbclient, Object.values(game.teamOne).concat(Object.values(game.teamTwo)), interaction.guildId);
+	delete ongoingGames[gameId];
 
-	return input.interaction.reply(createResultMessage(game)).then(async () =>
+	return interaction.reply(createResultMessage(game, interaction.member.id)).then(async () =>
 		setTimeout(async () => {
 			for (const channelId of [game.textID, game.voiceID, ...game.teamChannelIds]) {
-				const channel = await input.interaction.guild.channels.fetch(channelId);
+				const channel = await interaction.guild.channels.fetch(channelId);
 				await channel.delete();
 			}
 		}, 60000),

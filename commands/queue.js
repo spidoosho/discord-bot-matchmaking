@@ -25,50 +25,6 @@ module.exports = {
 			return interaction.reply(createQueueMessage(isPlayerNotInQueue));
 		}
 
-		const maps = await getMaps(dbclient);
-		const mapPreferences = await getPlayerMapPreferences(
-			dbclient,
-			interaction.user.id,
-			interaction.guildId,
-		);
-
-		// remove maps that user already have preference for
-		let mapPreferencesCount = 0;
-		if (mapPreferences !== undefined) {
-			mapPreferencesCount = Object.keys(mapPreferences).length - 1;
-		}
-
-		if (mapPreferencesCount !== maps.length) {
-			if (mapPreferencesCount > 0) {
-				for (const mapId of Object.keys(mapPreferences)) {
-					if (isNaN(mapId)) {
-						continue;
-					}
-
-					let removed = false;
-					for (let i = 0; i < maps.length && !removed; i++) {
-						if (maps[i].id.toString() === mapId.toString()) {
-							maps.splice(i, 1);
-							removed = true;
-							continue;
-						}
-					}
-				}
-			}
-
-			const messages = createResetMapsMessages(maps);
-
-			await interaction.reply({
-				content: 'You must fill out all map preferences before queuing up',
-				ephemeral: true,
-			});
-
-			for (const message of messages) {
-				await interaction.followUp(message);
-			}
-			return;
-		}
-
 		// add player to queue
 		let playerData = await getPlayerDataFromDb(
 			dbclient,
@@ -95,6 +51,50 @@ module.exports = {
 		}
 
 		// return message to print
-		return interaction.reply(createQueueMessage(isPlayerNotInQueue));
+		await interaction.reply(createQueueMessage(isPlayerNotInQueue));
+
+
+		const maps = await getMaps(dbclient);
+		const mapPreferences = await getPlayerMapPreferences(
+			dbclient,
+			interaction.user.id,
+			interaction.guildId,
+		);
+
+		// remove maps that user already have preference for
+		let mapPreferencesCount = 0;
+		if (mapPreferences !== undefined) {
+			mapPreferencesCount = Object.keys(mapPreferences).length;
+		}
+
+		if (mapPreferencesCount > 0 && mapPreferencesCount === maps.length) return;
+
+		if (mapPreferencesCount > 0) {
+			for (const mapId of Object.keys(mapPreferences)) {
+				if (isNaN(mapId)) {
+					continue;
+				}
+
+				let removed = false;
+				for (let i = 0; i < maps.length && !removed; i++) {
+					if (maps[i].id.toString() === mapId.toString()) {
+						maps.splice(i, 1);
+						removed = true;
+						continue;
+					}
+				}
+			}
+		}
+
+		const messages = createResetMapsMessages(maps);
+
+		await interaction.followUp({
+			content: 'Please fill out all map preferences.',
+			ephemeral: true,
+		});
+
+		for (const message of messages) {
+			await interaction.followUp(message);
+		}
 	},
 };

@@ -8,7 +8,7 @@ const dbclient = getClient();
 /**
  * Sends a JSON response of a player retrieved from the database
  */
-router.get('/player/:server/:username', async function(req, res) {
+router.get('/:server/:username', async function(req, res) {
 	const player = await getPlayerDataFromDb(dbclient, req.params.server, req.params.username);
 	res.json(player);
 });
@@ -16,7 +16,7 @@ router.get('/player/:server/:username', async function(req, res) {
 /**
  * Sends a JSON response with a string of a player
  */
-router.get('/player/:server/:username/text', async function(req, res) {
+router.get('/:server/:username/text', async function(req, res) {
 	const player = await getPlayerDataFromDb(dbclient, req.params.server, req.params.username);
 	const playerStr = `${player.displayName.S} - ${player.elo.N} (${player.gamesWon.N}: ${player.gamesLost.N})`;
 	res.json(playerStr);

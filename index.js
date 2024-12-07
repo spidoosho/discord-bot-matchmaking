@@ -22,11 +22,11 @@ const client = new Client({
 
 // create database client
 const dbclient = new DynamoDBClient({
-	region: process.env.DYNAMODB_REGION,
 	credentials: {
 		accessKeyId: process.env.DYNAMODB_ACCESS_KEY_ID,
 		secretAccessKey: process.env.DYNAMODB_SECRET_ACCESS_KEY,
 	},
+	region: process.env.DYNAMODB_REGION,
 });
 
 // get commands from commands folder
@@ -57,7 +57,7 @@ for (const file of eventFiles) {
 	// set different arguments for different events
 	switch (event.name) {
 	case Events.ClientReady:
-		client.once(event.name, async () => await event.execute(dbclient, client.guilds.cache.keys()));
+		client.once(event.name, async () => await event.execute(dbclient, client));
 		break;
 	case Events.GuildCreate:
 	case Events.GuildDelete:
@@ -71,6 +71,9 @@ for (const file of eventFiles) {
 		break;
 	case Events.InteractionCreate:
 		client.on(event.name, async (interaction) => await event.execute(interaction, client, dbclient, playersInQueue, lobbyVoiceChannels));
+		break;
+	case Events.GuildMemberRemove:
+		client.on(event.name, async (member) => await event.execute(dbclient, member.id));
 		break;
 	}
 }

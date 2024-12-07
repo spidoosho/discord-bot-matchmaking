@@ -58,6 +58,22 @@ function createAutoDequeueMessage(userId) {
 	return { content: message, components: [row], ephemeral: true };
 }
 
+function randomSideSelection() {
+	const sides = {
+		teamOne: 'Attackers',
+		teamTwo: 'Defenders',
+	};
+
+	const rnd = Math.floor(Math.random() * 2);
+
+	if (rnd === 1) {
+		sides.teamOne = 'Defenders';
+		sides.teamTwo = 'Attackers';
+	}
+
+	return sides;
+}
+
 function createTeamsMessage(textChannelId, teams, teamOneName, teamTwoName, selectedMap) {
 	let teamOne = `<@${teams.teamOne[0].id.N}>`;
 	let teamTwo = `<@${teams.teamTwo[0].id.N}>`;
@@ -81,13 +97,14 @@ function createTeamsMessage(textChannelId, teams, teamOneName, teamTwoName, sele
 				.setStyle(ButtonStyle.Primary),
 		);
 
+	const sides = randomSideSelection();
 	const embed = new EmbedBuilder()
 		.setColor(0x0099FF)
 		.setTitle(`The game is ready. Chosen map is ${selectedMap}!`)
 		.setDescription('After the game please submit the winner')
 		.addFields(
-			{ name: teamOneName, value: teamOne, inline: true },
-			{ name: teamTwoName, value: teamTwo, inline: true },
+			{ name: `${sides.teamOne}: ${teamOneName}`, value: teamOne, inline: true },
+			{ name: `${sides.teamTwo}: ${teamTwoName}`, value: teamTwo, inline: true },
 		)
 		.setTimestamp();
 
@@ -138,7 +155,7 @@ function createSelectMapMessage(maps, channelId) {
 	return { embeds: [embed], components: [row] };
 }
 
-function createResultMessage(game) {
+function createResultMessage(game, submitUserId) {
 	let teamOne = `<@${game.teamOne[0].id.N}>: ${game.teamOne[0].elo.N} (${getNumberStrWithOperand(game.teamOne[0].elo.N - game.teamOne[0].oldElo)})`;
 	let teamTwo = `<@${game.teamTwo[0].id.N}>: ${game.teamTwo[0].elo.N} (${getNumberStrWithOperand(game.teamTwo[0].elo.N - game.teamTwo[0].oldElo)})`;
 
@@ -159,7 +176,7 @@ function createResultMessage(game) {
 	const updatePreferenceComponent = createMenuSelectRow(game.map, 'update-map-preference');
 	const embed = new EmbedBuilder()
 		.setColor(0x0099FF)
-		.setTitle(`${game.teamNames[game.winnerTeamId - 1]} wins!`)
+		.setTitle(`Player <@${submitUserId}> selected team ${game.teamNames[game.winnerTeamId - 1]} as the winner!`)
 		.setDescription('Congratulations to the winners')
 		.addFields(
 			{ name: game.teamNames[0], value: teamOne, inline: true },

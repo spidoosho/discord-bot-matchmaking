@@ -10,7 +10,7 @@ const { setGameResult } = require('../src/game.js');
  */
 module.exports = {
 	name: Events.InteractionCreate,
-	async execute(interaction, client, dbclient, playersInQueue, lobbyVoiceChannels) {
+	async execute(interaction, client, dbclient, playersInQueue, lobbyVoiceChannels, ongoingMatches) {
 		let command = null;
 		let flagAndParams;
 
@@ -100,6 +100,32 @@ module.exports = {
 				break;
 			case 'me':
 				await command.execute(interaction, dbclient);
+				break;
+			case 'help':
+				await command.execute(interaction);
+				break;
+			case 'mmr':
+			case 'add-map':
+				await command.execute(interaction, dbclient);
+				break;
+			case 'add-admin':
+			case 'remove-admin':
+				await command.execute(interaction);
+				break;
+			case 'cancel-match':
+				await command.execute(interaction, ongoingMatches);
+				break;
+			case 'cancel-lobby':
+				await command.execute(interaction, lobbyVoiceChannels);
+				break;
+			case 'ban-player':
+				await command.execute(interaction, playersInQueue, dbclient);
+				break;
+			case 'sub-player':
+				await command.execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels);
+				break;
+			case 'reset-act':
+				await command.execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels, ongoingMatches);
 				break;
 			}
 		}
