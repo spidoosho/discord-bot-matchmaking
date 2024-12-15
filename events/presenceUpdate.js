@@ -10,12 +10,16 @@ const { createAutoDequeueMessage } = require('../src/messages.js');
  */
 module.exports = {
 	name: Events.PresenceUpdate,
-	async execute(newMember, playersInQueue) {
+	async execute(args) {
+		const [oldPresence, newPresence] = args.args;
+
 		// check if user went offline and if is in queue
-		if (newMember.status !== OFFLINE_STATUS || !(newMember.userId in playersInQueue)) return;
+		if (newPresence.status !== OFFLINE_STATUS || !(args.matchmakingManager.isPlayerInQueue(newPresence.guild.id, newPresence.userId))) {
+			return;
+		}
 
 		// remove from queue
-		delete playersInQueue[newMember.userId];
-		await newMember.user.send(createAutoDequeueMessage(newMember.userId));
+		args.matchmakingManager.dequeuePlayer(newPresence.guild.id, newPresence.userId);
+		await newPresence.user.send(createAutoDequeueMessage(newPresence.guild.id, newPresence.userId));
 	},
 };

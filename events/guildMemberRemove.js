@@ -1,7 +1,6 @@
 const { Events } = require('discord.js');
-const {
-	createOrClearGuildTables,
-} = require('../src/database.js');
+
+const db = require('../src/sqliteDatabase.js');
 
 /**
  * Emitted whenever a member leaves of is kicked from a Discord server.
@@ -9,7 +8,9 @@ const {
  */
 module.exports = {
 	name: Events.GuildMemberRemove,
-	async execute(dbclient, memberId) {
+	async execute(args) {
+		const [member] = args.args;
 
+		await db.removePlayerFromDatabase(member.guild.id, args.sqlClient, member.id);
 	},
 };

@@ -1,4 +1,6 @@
-const { QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, MAP_CHANGE_THRESHOLD, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
+const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, MAP_CHANGE_THRESHOLD, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
+const sqlDb = require('../src/sqliteDatabase.js');
+
 const { ChannelType } = require('discord.js');
 function isQueueInVoice(queueIds, voiceChannelMembers) {
 	for (const id of queueIds) {
@@ -7,6 +9,32 @@ function isQueueInVoice(queueIds, voiceChannelMembers) {
 		}
 	}
 	return true;
+}
+
+/**
+ * Gets highest permission role name based on database and discord roles
+ * @param {*} interaction interaction
+ * @param {Database} sqlClient Sqlitecloud client
+ * @returns {Promise<string|undefined>} highest role name or undefined if not found any
+ */
+async function getHighestPermissionName(interaction, sqlClient) {
+	const roles = await sqlDb.getDatabaseRoles(sqlClient, interaction.guildId);
+
+	let dbAdminId;
+	if (ADMIN_ROLE_NAME in roles) {dbAdminId = roles[ADMIN_ROLE_NAME];}
+
+	let dbSuperAdminId;
+	if (SUPER_ADMIN_ROLE_NAME in roles) {dbSuperAdminId = roles[SUPER_ADMIN_ROLE_NAME];}
+
+	if (dbSuperAdminId !== undefined && interaction.member.roles.cache.has(dbSuperAdminId)) {
+		return SUPER_ADMIN_ROLE_NAME;
+	}
+
+	if (dbAdminId !== undefined && interaction.member.roles.cache.has(dbAdminId)) {
+		return ADMIN_ROLE_NAME;
+	}
+
+	return undefined;
 }
 
 function getNumberStrWithOperand(num) {
@@ -95,4 +123,4 @@ async function getGamesCategoryChannel(guild) {
 	}).then(channel => channel);
 }
 
-module.exports = { isQueueInVoice, splitCommand, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, selectMap, getGamesCategoryChannel };
+module.exports = { getHighestPermissionName, isQueueInVoice, splitCommand, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, selectMap, getGamesCategoryChannel };

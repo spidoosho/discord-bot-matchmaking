@@ -1,14 +1,18 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getPlayerDataFromDb } = require('../src/database.js');
+const db = require('../src/sqliteDatabase.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('mmr')
 		.setDescription('Get information about matchmaking rating (MMR)'),
-	async execute(interaction, dbclient) {
+	async execute(interaction, args, sqlClient, matchmakingManager) {
 		console.log('[DEBUG]: Executing mmr');
 
-		const playerData = await getPlayerDataFromDb(dbclient, interaction.user.id, interaction.guildId);
+		const [playerData] = await db.getPlayerData(sqlClient, interaction.guildId, [interaction.user.id]);
+
+		if (playerData === undefined) {
+			return interaction.reply({ content: 'You have to join the queue first.', ephemeral: true });
+		}
 
 		console.log('done');
 		const embed = new EmbedBuilder()

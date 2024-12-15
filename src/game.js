@@ -3,12 +3,9 @@ const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
 const { createTeamsMessage, createResultMessage, createSelectMapMessage } = require('../src/messages.js');
 const { getAverageTeamElo, getGamesCategoryChannel } = require('../src/utils.js');
 const { updateElosAndGameCounts, getPlayersMapsPreferences, getMapNames } = require('../src/database.js');
-const { VoiceLobby } = require('./gameController.js');
+const { VoiceLobby } = require('./gameControllers.js');
 
-/**
- * Creates text and voice channel for a game.
- * @param {Object} input input dictionary
- */
+
 async function createLobby(interaction, dbclient, gameController) {
 	// remove players from queue
 	// while going through players, get players ids for tagging
