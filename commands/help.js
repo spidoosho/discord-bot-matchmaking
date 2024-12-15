@@ -5,7 +5,7 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('help')
 		.setDescription('Lists all available commands'),
-	async execute(interaction) {
+	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const embed = new EmbedBuilder()
 			.setColor(0x0099FF)
 			.setTitle('Available commands')

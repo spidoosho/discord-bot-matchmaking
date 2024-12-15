@@ -1,8 +1,5 @@
 const { Events, InteractionType } = require('discord.js');
-const {	resetMapPreference,	updateMapPreference } = require('../src/database.js');
 const { COMMAND } = require('../src/constants.js');
-const {	splitCommand, addVoteForMap } = require('../src/utils.js');
-const { setGameResult } = require('../src/game.js');
 
 /**
  * Emitted whenever this discord bot leaves a Discord server.
@@ -10,124 +7,53 @@ const { setGameResult } = require('../src/game.js');
  */
 module.exports = {
 	name: Events.InteractionCreate,
-	async execute(interaction, client, dbclient, playersInQueue, lobbyVoiceChannels, ongoingMatches) {
+
+	/**
+	 *
+	 * @param {*} interaction
+	 * @param {Client} client
+	 * @param {DynamoDBClient} dbclient
+	 * @param {MatchmakingManager} matchmakingManager
+	 * @returns
+	 */
+	async execute(args) {
+		const [interaction] = args.args;
+
 		let command = null;
-		let flagAndParams;
+		let splitCommand;
 
 		if (!interaction.isChatInputCommand()) {
-		// custom interaction with customID
-			if (interaction.type === InteractionType.MessageComponent) {
-				flagAndParams = splitCommand(interaction.customId);
-				if (flagAndParams.flag === COMMAND) {
-				// button interaction is a command
-					command = client.commands.get(flagAndParams.params[0]);
-					flagAndParams.flag = flagAndParams.params[0];
-				}
-				if (interaction.values !== undefined && interaction.values.length > 0) {
-					flagAndParams.params = flagAndParams.params.concat(
-						interaction.values[0].split('_'),
-					);
-				}
+			// custom interaction with customID
+			if (interaction.type !== InteractionType.MessageComponent) {
+				return;
 			}
+
+			splitCommand = interaction.customId.split('_');
+
+			if (splitCommand[0] === COMMAND) {
+				// button interaction is a command
+				splitCommand.shift();
+				command = args.dcClient.commands.get(splitCommand[0]);
+			}
+			else {
+				// custom command
+				command = args.dcClient.customCommands.get(splitCommand[0]);
+			}
+
+			splitCommand.shift();
 		}
 		else {
-		// command interaction
-			flagAndParams = splitCommand(interaction.commandName);
-			command = client.commands.get(flagAndParams.flag);
-		}
-
-		if (!command) {
-			try {
-			// custom interaction
-				let message = 'Done';
-				let messageSent = false;
-				switch (flagAndParams.flag) {
-				case 'reset-map-preference':
-					message = await resetMapPreference(interaction, dbclient, flagAndParams.params);
-					break;
-				case 'update-map-preference':
-					message = await updateMapPreference(interaction, dbclient, flagAndParams.params);
-					break;
-				case 'set-game-result':
-					await setGameResult(interaction, flagAndParams.params, dbclient);
-					messageSent = true;
-					break;
-				case 'chosen-map':
-					message = addVoteForMap(lobbyVoiceChannels, flagAndParams.params);
-					break;
-				}
-
-				if (!messageSent) {
-					await interaction.reply({ content: message, ephemeral: true });
-				}
-			}
-			catch (error) {
-				console.error(error);
-				if (interaction.replied || interaction.deferred) {
-					await interaction.followUp({
-						content: 'There was an error while executing this command!',
-						ephemeral: true,
-					});
-				}
-				else {
-					await interaction.reply({
-						content: 'There was an error while executing this command!',
-						ephemeral: true,
-					});
-				}
+			if (interaction.guildId === null) {
+				// allow users to use the Bot only in servers
+				return interaction.reply('Please use slash commands only in servers.');
 			}
 
-			return;
+			// command interaction
+			command = args.dcClient.commands.get(interaction.commandName);
 		}
 
 		try {
-		// command interaction
-			switch (flagAndParams.flag) {
-			case 'queue':
-				await command.execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels);
-				break;
-			case 'dequeue':
-				await command.execute(interaction, playersInQueue);
-				break;
-			case 'debug':
-				await command.execute(interaction);
-				break;
-			case 'leaderboard':
-				await command.execute(interaction, dbclient);
-				break;
-			case 'reset-maps-preferences':
-				await command.execute(interaction, dbclient);
-				break;
-			case 'me':
-				await command.execute(interaction, dbclient);
-				break;
-			case 'help':
-				await command.execute(interaction);
-				break;
-			case 'mmr':
-			case 'add-map':
-				await command.execute(interaction, dbclient);
-				break;
-			case 'add-admin':
-			case 'remove-admin':
-				await command.execute(interaction);
-				break;
-			case 'cancel-match':
-				await command.execute(interaction, ongoingMatches);
-				break;
-			case 'cancel-lobby':
-				await command.execute(interaction, lobbyVoiceChannels);
-				break;
-			case 'ban-player':
-				await command.execute(interaction, playersInQueue, dbclient);
-				break;
-			case 'sub-player':
-				await command.execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels);
-				break;
-			case 'reset-act':
-				await command.execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels, ongoingMatches);
-				break;
-			}
+			await command.execute(interaction, splitCommand, args.sqlClient, args.matchmakingManager);
 		}
 		catch (error) {
 			console.error(error);

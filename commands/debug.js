@@ -7,9 +7,9 @@ module.exports = {
 		.setName(moduleName)
 		.setDescription('Debug')
 		.setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
-	async execute(interaction) {
+	async execute(interaction, args, sqlClient, matchmakingManager) {
 		console.log(`executing ${moduleName}`);
-
-		return interaction.reply({ content: 'Done.', ephemeral: true });
+		matchmakingManager.inc();
+		return interaction.reply({ content: `Done. ${matchmakingManager.get()} ${new Date()}`, ephemeral: true });
 	},
 };

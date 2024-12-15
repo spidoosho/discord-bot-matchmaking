@@ -1,24 +1,34 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
 const { createLobby } = require('../src/game.js');
+const sqlDb = require('../src/sqliteDatabase.js');
 const {
-	getPlayerDataFromDb,
-	addPlayerToDB,
-	getPlayerMapPreferences,
-	getMaps,
-} = require('../src/database.js');
-const {
-	createQueueMessage,
-	createResetMapsMessages,
+	createSelectMenuMapPreferences,
 } = require('../src/messages.js');
+const { createSelectMapMessage } = require('../src/messages');
+const { getGamesCategoryChannel } = require('../src/utils');
+const { PlayerData } = require('../src/gameControllers.js');
+const { START_ELO } = require('../src/constants.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('queue')
 		.setDescription('Join the queue.'),
-	async execute(interaction, dbclient, playersInQueue, lobbyVoiceChannels) {
+	/**
+	 *
+	 * @param interaction
+	 * @param sqlClient
+	 * @param {MatchmakingManager} matchmakingManager
+	 * @return {Promise<*>}
+	 */
+	async execute(interaction, args, sqlClient, matchmakingManager) {
 		console.log('[DEBUG]: Executing queue');
 
-		const isPlayerNotInQueue = !(playersInQueue.isPlayerInQueue(interaction.user.id));
+		let guildId = interaction.guildId;
+		if (guildId === null) {
+			guildId = args[0];
+		}
+
+		const isPlayerNotInQueue = !(matchmakingManager.isPlayerInQueue(guildId, interaction.user.id));
 
 		// player is already in queue
 		if (!isPlayerNotInQueue) {
@@ -26,75 +36,124 @@ module.exports = {
 		}
 
 		// add player to queue
-		let playerData = await getPlayerDataFromDb(
-			dbclient,
-			interaction.user.id,
-			interaction.guildId,
-		);
-
-		if (playerData === undefined) {
-			await addPlayerToDB(dbclient, interaction.user.id, interaction.user.username, interaction.user.tag, interaction.guildId);
-			playerData = await getPlayerDataFromDb(
-				dbclient,
-				interaction.user.id,
-				interaction.guildId,
-			);
-		}
+		const [playerData] = await getPlayerData(sqlClient, interaction, guildId);
 
 		// add player to queue
-		playersInQueue.addPlayer(playerData.id, playerData);
+		matchmakingManager.enqueuePlayer(guildId, playerData);
 
 		// if there is enough players, start a lobby
-		if (playersInQueue.isThereEnoughPlayersForGame()) {
-			const lobby = createLobby(interaction, dbclient);
-			lobbyVoiceChannels.addLobby(lobby);
+		if (matchmakingManager.isThereEnoughPlayersForMatch(guildId)) {
+			await createLobby(interaction, sqlClient, matchmakingManager);
 		}
 
 		// return message to print
+		// skip missing map preference messages if command sent in direct messages
+		if (interaction.guildId === null) {
+			return interaction.reply(createQueueMessage(isPlayerNotInQueue, guildId));
+		}
+
 		await interaction.reply(createQueueMessage(isPlayerNotInQueue));
-
-
-		const maps = await getMaps(dbclient);
-		const mapPreferences = await getPlayerMapPreferences(
-			dbclient,
-			interaction.user.id,
-			interaction.guildId,
-		);
-
-		// remove maps that user already have preference for
-		let mapPreferencesCount = 0;
-		if (mapPreferences !== undefined) {
-			mapPreferencesCount = Object.keys(mapPreferences).length;
-		}
-
-		if (mapPreferencesCount > 0 && mapPreferencesCount === maps.length) return;
-
-		if (mapPreferencesCount > 0) {
-			for (const mapId of Object.keys(mapPreferences)) {
-				if (isNaN(mapId)) {
-					continue;
-				}
-
-				let removed = false;
-				for (let i = 0; i < maps.length && !removed; i++) {
-					if (maps[i].id.toString() === mapId.toString()) {
-						maps.splice(i, 1);
-						removed = true;
-						continue;
-					}
-				}
-			}
-		}
-
-		const messages = createResetMapsMessages(maps);
-
-		await interaction.followUp({
-			content: 'Please fill out all map preferences.',
-			ephemeral: true,
-		});
-
-		for (const message of messages) {
-			await interaction.followUp(message);
-		}
+		await getPlayerMapsPreferences(sqlClient, interaction, guildId, playerData);
 	},
 };
+
+async function getPlayerMapsPreferences(sqlClient, interaction, playerData) {
+	const mapsPreferences = await sqlDb.getMapsPreferencesData(sqlClient, interaction.guildId, [playerData]);
+
+	const messages = createSelectMenuMapPreferences(mapsPreferences, false);
+
+	await interaction.followUp({
+		content: 'Please fill out all map preferences.',
+		ephemeral: true,
+	});
+
+	for (const message of messages) {
+		await interaction.followUp(message);
+	}
+}
+
+async function getPlayerData(dbClient, interaction, guildId) {
+	let playerData = await sqlDb.getPlayerData(
+		dbClient,
+		guildId,
+		[interaction.user.id],
+	);
+
+	if (playerData.length !== 0) {
+		return playerData;
+	}
+
+	playerData = new PlayerData(interaction.user.id, interaction.user.username, 0, 0, START_ELO);
+	await sqlDb.addPlayer(dbClient, guildId, playerData);
+
+	return [playerData];
+}
+
+function createQueueMessage(wasSuccessful, guildId = undefined) {
+	// add button to dequeue to the message
+	let id = '';
+	let ephemeral = true;
+	if (guildId !== undefined) {
+		id = guildId;
+		ephemeral = false;
+	}
+	const row = new ActionRowBuilder()
+		.addComponents(
+			new ButtonBuilder()
+				.setCustomId(`command_dequeue_${id}`)
+				.setLabel('Leave the queue')
+				.setStyle(ButtonStyle.Primary),
+		);
+
+	let message;
+	if (wasSuccessful) {
+		message = 'You have joined the queue.';
+	}
+	else {
+		message = 'You are already in queue!';
+	}
+
+	return { content: message, components: [row], ephemeral };
+}
+
+function getUniqueLobbyName(interaction, players) {
+	// creates a temporary voice channel to gather chosen players
+	// get unique name by indexing channel
+	const playerName = players[Object.keys(players)[0]].displayName;
+	let newLobbyName = `game-${playerName}`;
+	let index = 0;
+	while (interaction.guild.channels.cache.find(channel => channel.name === newLobbyName)) {
+		newLobbyName = `game-${playerName}-${++index}`;
+	}
+
+	return newLobbyName;
+}
+
+async function createLobbyChannels(lobby, interaction, matchmakingManager) {
+	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild);
+
+	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId)}`;
+
+	const voiceId = await interaction.member.guild.channels.create({
+		name: lobbyName,
+		type: ChannelType.GuildVoice,
+		parent: gameCategoryChannel.id,
+	}).then(channel => channel.id);
+
+	matchmakingManager.createLobby(interaction.guildId, interaction);
+
+	// creates a text channel for game info and for players to chat
+	// send a message tagging players to join voice lobby channel
+	const textId = await interaction.member.guild.channels.create({
+		name: lobbyName,
+		type: ChannelType.GuildText,
+		parent: gameCategoryChannel.id,
+	}).then(channel => {
+		channel.send(`Players selected for this game: ${playersIdStr}`);
+		channel.send(createSelectMapMessage(mapNames, voiceId));
+		channel.send(`Please join <#${voiceId}> to start the game.`);
+		return channel.id;
+	});
+
+	return textId, voiceId;
+}

@@ -10,7 +10,7 @@ const {
 	DeleteTableCommand,
 } = require('@aws-sdk/client-dynamodb');
 
-const { PlayerData } = require('./gameController.js');
+const { PlayerData } = require('./gameControllers.js');
 
 const {
 	LEADERBOARD_TABLE_NAME,

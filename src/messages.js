@@ -3,53 +3,11 @@ const { QUEUE_CHANNEL_ID } = require('./constants.js');
 const { getNumberStrWithOperand } = require('./utils.js');
 const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 
-function createQueueMessage(wasSuccessful) {
-	// add button to dequeue to the message
+function createAutoDequeueMessage(guildId, userId) {
 	const row = new ActionRowBuilder()
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId('command_dequeue')
-				.setLabel('Leave the queue')
-				.setStyle(ButtonStyle.Primary),
-		);
-
-	let message;
-	if (wasSuccessful) {
-		message = 'You have joined the queue.';
-	}
-	else {
-		message = 'You are already in queue!';
-	}
-
-	return { content: message, components: [row], ephemeral: true };
-}
-
-function createDequeueMessage(wasSuccessful) {
-	// add button to queue to the message
-	let message;
-	if (wasSuccessful) {
-		message = 'You have been dequeued.';
-	}
-	else {
-		message = 'You are not in queue!';
-	}
-
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId('command_queue')
-				.setLabel('Join the queue')
-				.setStyle(ButtonStyle.Primary),
-		);
-
-	return { content: message, components: [row], ephemeral: true };
-}
-
-function createAutoDequeueMessage(userId) {
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId('queue')
+				.setCustomId(`command_queue_${guildId}`)
 				.setLabel('Join the queue while being offline')
 				.setStyle(ButtonStyle.Primary),
 		);
@@ -189,8 +147,8 @@ function createResultMessage(game, submitUserId) {
 
 function createMenuSelectRow(map, customId) {
 	const select = new StringSelectMenuBuilder()
-		.setCustomId(`${customId}_${map.Name}`)
-		.setPlaceholder(`Select your map preference for ${map.Name}`);
+		.setCustomId(`${customId}_${map.name}`)
+		.setPlaceholder(`Select your map preference for ${map.name}`);
 
 	for (let i = 1; i <= 10; i++) {
 		select.addOptions(new StringSelectMenuOptionBuilder()
@@ -206,7 +164,11 @@ function createResetMapsMessages(maps) {
 	let row = [];
 
 	for (const map of maps) {
-		row.push(createMenuSelectRow(map, 'reset-map-preference'));
+		let customId = 'update-map-preference';
+		if (map.value === 0) {
+			customId = 'add-map-preference';
+		}
+		row.push(createMenuSelectRow(map, customId));
 		if (row.length >= 5) {
 			rows.push(row);
 			row = [];
@@ -226,42 +188,19 @@ function createResetMapsMessages(maps) {
 	return result;
 }
 
-function createLeaderboardMessage(leaderboard) {
-	let text = `1. <@${leaderboard[0].id.N}> - ${leaderboard[0].elo.N} (${leaderboard[0].gamesWon.N}:${leaderboard[0].gamesLost.N})`;
+function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
+	const maps = [];
 
-	for (let i = 1; i < leaderboard.length; i++) {
-		text += `\n${i + 1}. <@${leaderboard[i].id.N}> - ${leaderboard[i].elo.N} (${leaderboard[i].gamesWon.N}:${leaderboard[i].gamesLost.N})`;
+	for (const [key, value] of Object.entries(mapsPreferences.maps)) {
+		// index 0 because there is only one player in the matrix
+		if (!onlyAdd || mapsPreferences.matrix[0][value.index] === 0) {
+			value.id = key;
+			value.value = mapsPreferences.matrix[0][value.index];
+			maps.push(value);
+		}
 	}
 
-	const embed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle('Leaderboard')
-		.setDescription(text)
-		.setTimestamp();
-
-	return { embeds: [embed], ephemeral: true };
+	return createResetMapsMessages(maps);
 }
 
-function createMessageAboutPlayer(playerData) {
-	let maps = '';
-	for (const mapInfo of Object.values(playerData.mapPreferences)) {
-		let value = mapInfo.Value;
-		if (isNaN(value)) {value = 'not set';}
-		maps += `${mapInfo.Name}: ${value}, `;
-	}
-	maps = maps.slice(0, -2);
-
-	const embed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle('Data about you')
-		.addFields(
-			{ name: 'Elo', value: playerData.elo, inline: true },
-			{ name: 'Score', value: `(${playerData.gamesWon}:${playerData.gamesLost})`, inline: true },
-			{ name: 'Map preferences', value: maps },
-		)
-		.setTimestamp();
-
-	return { embeds: [embed], ephemeral: true };
-}
-
-module.exports = { createDequeueMessage, createAutoDequeueMessage, createTeamsMessage, createQueueMessage, setPinnedQueueMessage, createResultMessage, createLeaderboardMessage, createMessageAboutPlayer, createResetMapsMessages, createSelectMapMessage };
+module.exports = { createAutoDequeueMessage, createTeamsMessage, setPinnedQueueMessage, createResultMessage, createSelectMenuMapPreferences, createSelectMapMessage };

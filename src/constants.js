@@ -15,3 +15,5 @@ exports.SUPER_ADMIN_ROLE_NAME = 'ValoJs SuperAdmin';
 exports.SUPER_ADMIN_ROLE_CREATE_REASON = 'ValoJs needs a role for super admin';
 exports.ADMIN_ROLE_NAME = 'ValoJs Admin';
 exports.ADMIN_ROLE_CREATE_REASON = 'ValoJs needs a role for admin';
+exports.VALOJS_CHANNEL_CATEGORY_NAME = 'VALOJS GAMES';
+exports.VALOJS_CATEGORY_CHANNEL = 'VALOJS';

@@ -1,6 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-
-const { getMaps } = require('../src/database.js');
+const { getHighestPermissionName } = require('../src/utils.js');
 const { ADMIN_ROLE_NAME } = require('../src/constants.js');
 
 module.exports = {
@@ -15,26 +14,21 @@ module.exports = {
 			option.setName('reason')
 				.setDescription('reason of the ban')
 				.setRequired(true)),
-	async execute(interaction, dbclient) {
-		// check if sender is an admin
+	async execute(interaction, args, sqlClient, matchmakingManager) {
+		const maxRole = getHighestPermissionName(interaction, sqlClient);
 
-		// check if text channel is a lobby
-
-		// remove lobby and notify all players
-
-		// set timer to delete channels
-		const adminRole = interaction.guild.roles.cache.find(item => item.name === ADMIN_ROLE_NAME);
-
-		if (adminRole === undefined) {
-			return interaction.reply({ content: `${ADMIN_ROLE_NAME} role not found.`, ephemeral: true });
+		if (maxRole === undefined) {
+			interaction.reply({ content: 'Only admins can execute this command!' });
+			return;
 		}
 
-		if (!interaction.member.roles.cache.has(adminRole.id)) {
-			return interaction.reply({ content: `Only <@&${adminRole.id}> can add new admins.`, ephemeral: true });
-		}
+		const playerToBan = interaction.options.getUser('player');
+		const banReason = interaction.options.getString('reason');
 
-		const newMap = interaction.options.getUser('map');
+		// TODO: change to ban?
+		// TODO: add permission to kick/ban
+		await interaction.guild.members.kick(playerToBan.id, banReason);
 
-		return interaction.reply({ content: `Map ${newMap} added to the map pool.`, ephemeral: true });
+		return interaction.reply({ content: 'Player has been banned.', ephemeral: true });
 	},
 };

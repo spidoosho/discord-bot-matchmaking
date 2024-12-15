@@ -1,7 +1,5 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
-
-const { getMaps } = require('../src/database.js');
-const { ADMIN_ROLE_NAME } = require('../src/constants.js');
+const { getHighestPermissionName } = require('../src/utils.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -16,40 +14,36 @@ module.exports = {
 			option.setName('reason')
 				.setDescription('reason of cancellation')
 				.setRequired(true)),
-	async execute(interaction, dbclient) {
-		// check if sender is an admin
+	async execute(interaction, args, sqlClient, matchmakingManager) {
+		const maxRole = await getHighestPermissionName(interaction, sqlClient);
 
-		// check if text channel is a game
-
-		// remove game and notify all players
-
-		// set timer to delete channels
-
-		const adminRole = interaction.guild.roles.cache.find(item => item.name === ADMIN_ROLE_NAME);
-
-		if (adminRole === undefined) {
-			return interaction.reply({ content: `${ADMIN_ROLE_NAME} role not found.`, ephemeral: true });
+		if (maxRole === undefined) {
+			interaction.reply({ content: 'Only admins can execute this command!' });
+			return;
 		}
 
-		if (!interaction.member.roles.cache.has(adminRole.id)) {
-			return interaction.reply({ content: `Only <@&${adminRole.id}> can add new admins.`, ephemeral: true });
+		const channel = interaction.options.getChannel('channel');
+		const reason = interaction.options.getString('reason');
+
+		// TODO: Try this
+		const cancelled = matchmakingManager.cancelMatch(channel.name);
+
+		if (!cancelled) {
+			return interaction.reply({ content: `Channel ${channel} is not a match`, ephemeral: true });
 		}
 
-		const newMap = interaction.options.getUser('map');
-		const maps = await getMaps(dbclient);
-		let found = false;
+		await interaction.reply({ content: `Match ${channel} cancelled.`, ephemeral: true });
 
-		for (let i = 0; i < maps.length && !found; i++) {
-			if (maps[i].Name.toLowerCase() === newMap.toLowerCase()) {
-				found = true;
+		interaction.guild.channels.cache.forEach(async (chan) => {
+			if (chan.name.includes(channel.name)) return;
+
+			if (chan.type === ChannelType.GuildText) {
+				await channel.send(`Match cancelled by ${interaction.user}. Reason: ${reason}. No ratings have been updated. Match channels will be deleted after 1 minute`);
 			}
-		}
 
-		if (found) {
-			return interaction.reply({ content: `Map ${newMap} is already in the map pool.`, ephemeral: true });
-		}
-
-
-		return interaction.reply({ content: `Map ${newMap} added to the map pool.`, ephemeral: true });
+			setTimeout(async () => {
+				await interaction.guild.channels.delete(chan.id);
+			}, 60000);
+		});
 	},
 };
