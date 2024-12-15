@@ -1,3 +1,8 @@
+.idea
+.idea/vcs.xml
+.idea/modules.xml
+.idea/discord-bot-matchmaking.iml
+
 # Logs
 logs
 *.log
