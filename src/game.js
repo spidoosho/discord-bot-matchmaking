@@ -1,7 +1,7 @@
 const { ChannelType } = require('discord.js');
 const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
 const { createTeamsMessage, createResultMessage, createSelectMapMessage } = require('../src/messages.js');
-const { getAverageTeamElo, getGamesCategoryChannel } = require('../src/utils.js');
+const { getAverageTeamElo, getGamesCategoryChannel, selectMap } = require('../src/utils.js');
 const { updateElosAndGameCounts, getPlayersMapsPreferences, getMapNames } = require('../src/database.js');
 const { VoiceLobby } = require('./gameControllers.js');
 
@@ -57,7 +57,8 @@ async function createLobby(interaction, dbclient, gameController) {
 	return new VoiceLobby(voiceId, textId, players, mapNames);
 }
 
-async function getSuitableMaps(dbclient, playerIds, guildId) {
+async function getSuitableMaps(mapsPreferences) {
+	/*
 	const mapsPrefsDict = await getPlayersMapsPreferences(dbclient, playerIds, guildId);
 
 	const bestLeastMiseryArr = getBestLeastMiseryMapIndices(Object.values(mapsPrefsDict));
@@ -68,7 +69,8 @@ async function getSuitableMaps(dbclient, playerIds, guildId) {
 	result.push(getFirstUniqueIndex(bestLeastMiseryArr, result));
 	result.push(getFirstUniqueIndex(bestAverageArr, result));
 	result.push(getFirstUniqueIndex(bestPleasureArr, result));
-	return result;
+	*/
+	return [{name:'Haven', id:2}, {name:'Ascent', id:4}, {name:'Split', id:3}];
 }
 
 function getFirstUniqueIndex(mapArr, uniqueArr) {
@@ -159,6 +161,14 @@ function getBestValueMapIndex(leastMiseryDict) {
 	}
 
 	return maxPrefIndex;
+}
+
+function splitPlayers(playerDataArr) {
+
+}
+
+function selectMap(playersMapsPreferences, mapVotes) {
+
 }
 
 function balanceTeams(queue) {
@@ -360,4 +370,4 @@ async function setGameResult(interaction, ongoingGames, dbclient) {
 	);
 }
 
-module.exports = { balanceTeams, createLobby, separatePlayers, getNewElo, setGameResult };
+module.exports = { balanceTeams, createLobby, separatePlayers, getNewElo, setGameResult, getSuitableMaps, splitPlayers, selectMap };

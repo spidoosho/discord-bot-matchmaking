@@ -1,4 +1,8 @@
 const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby } = require('./gameControllers');
+const { getSuitableMaps, splitPlayers, selectMap } = require('../src/game.js');
+
+const db = require('../src/sqliteDatabase.js');
+
 
 class MatchmakingManager {
 	/**
@@ -35,8 +39,8 @@ class MatchmakingManager {
 		return this.guildManagers[guildId].getUniqueLobbyId();
 	}
 
-	async createLobby(guildId, interaction, dbClient) {
-		return this.guildManagers[guildId].createLobby(interaction, dbClient);
+	async createLobby(guildId, voiceId, textId, dbClient) {
+		this.guildManagers[guildId].createLobby(guildId, voiceId, textId, dbClient);
 	}
 
 	cancelLobby(guildId, lobbyKey) {
@@ -53,6 +57,18 @@ class MatchmakingManager {
 
 	getLobbyAndMatchCount(guildId) {
 		return this.guildManagers[guildId].getLobbyAndMatchCount();
+	}
+
+	addVote(guildId, channelId, playerId, mapId) {
+		return this.guildManagers[guildId].addVote(channelId, playerId, mapId);
+	}
+
+	isPlayerInLobby(guildId, voiceId, playerId){
+		return this.guildManagers[guildId].isPlayerInLobby(voiceId, playerId);
+	}
+
+	startMatch(guildId, voiceId) {
+		return this.guildManagers[guildId].startMatch(voiceId);
 	}
 }
 
@@ -105,13 +121,15 @@ class GuildManager {
 		return this.playersInQueue.isThereEnoughPlayersForGame();
 	}
 
-	async createLobby(interaction, dbClient) {
+	async createLobby(guildId, voiceId, textId, dbClient) {
 		const playersArr = this.playersInQueue.extractPlayers();
-		const maps = await getSuitableMaps(dbClient, playersArr, interaction.guildId);
+		const mapsPreferences = db.getMapsPreferencesData(dbClient, guildId, playersArr);
+		const maps = await getSuitableMaps(mapsPreferences);
 
-		this.voiceChannelLobbies.createLobby(interaction, dbClient);
+		const voiceLobby =  new VoiceLobby(playersArr, maps);
+		this.voiceChannelLobbies.addLobby(voiceId, textId, voiceLobby);
 
-		return new VoiceLobby(playersArr, maps);
+		return voiceLobby;
 	}
 
 	cancelLobby(lobbyKey) {
@@ -128,6 +146,23 @@ class GuildManager {
 
 	getLobbyAndMatchCount() {
 		return [this.voiceChannelLobbies.getLobbyCount(), this.ongoingMatches.getMatchCount()];
+	}
+
+	addVote(lobbyId, playerId, mapId) {
+		this.voiceChannelLobbies.addVote(lobbyId, playerId, mapId);
+	}
+
+	isPlayerInLobby(voiceId, playerId){
+		return this.voiceChannelLobbies.isPlayerInLobby(voiceId, playerId);
+	}
+
+	startMatch(voiceId) {
+		const [textId, voiceLobby] = this.voiceChannelLobbies.removeLobby(voiceId);
+		
+		const teams = splitPlayers(voiceLobby.players);
+		const map = selectMap(playerMapsPreferences, voiceLobby.mapVotes);
+
+		return this.ongoingMatches.addMatch(textId, voiceId, teams, map);
 	}
 }
 

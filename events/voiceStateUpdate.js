@@ -14,32 +14,44 @@ const { separatePlayers } = require('../src/game.js');
  */
 module.exports = {
 	name: Events.VoiceStateUpdate,
-	async execute(client, newMember, lobbyVoiceChannels, ongoingGames) {
+	async execute(args) {
+		const [oldState, newState] = args.args;
+
 		// check only connections to lobby voice channel
-		if (newMember.channelId === null || lobbyVoiceChannels.isPlayerInLobby(newMember.channelId)) return;
-
 		// check if enough players are in the channel
-		const channel = await client.channels.fetch(newMember.channelId);
-		if (channel.members.size < COUNT_PLAYERS_GAME) return;
+		if (newState.channelId === null
+			|| !args.matchmakingManager.isPlayerInLobby(newState.guild.id, newState.channelId, newState.member.id)
+			|| newState.channel.members.size < COUNT_PLAYERS_GAME) return;
+		
+		const players = args.matchmakingManager.getPlayers(newState.guild.id, newState.channelId);
 
-		// check for correct players
-		const playerIds = Object.keys(
-			lobbyVoiceChannels[newMember.channelId].players,
-		);
-		if (isQueueInVoice(playerIds, channel.members) && newMember.channelId in lobbyVoiceChannels) {
-			// remove lobby
-			const voiceChannel = lobbyVoiceChannels[newMember.channelId];
-			delete lobbyVoiceChannels[newMember.channelId];
+		if (isQueueInVoice(players, channel.members)) {
 
-			// start match
-			voiceChannel.voiceID = newMember.channelId;
-			voiceChannel.guild = newMember.guild;
+			const match = args.matchmakingManager.startMatch(newState.guild.id, newState.channelId);
 
-			const map = selectMap(voiceChannel.maps);
-			const game = await separatePlayers(voiceChannel, map);
-			ongoingGames[game.id] = game.gameInfo;
+			const textChannel = newState.guild.channels.cache.get(match.textId)
+			await createTeamChannelsAndMovePlayers(match);
+			await textChannel.send(createMatchMessage(match));
+
 		}
 
 	},
-
 };
+
+function isQueueInVoice(players, voiceChannelMembers) {
+	for (const playerData of players) {
+		if (!voiceChannelMembers.has(playerData.id)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+createTeamChannelsAndMovePlayers(match) {
+	
+}
+
+createMatchMessage(match){
+
+}

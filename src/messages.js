@@ -105,7 +105,7 @@ function createSelectMapMessage(maps, channelId) {
 		row.addComponents(
 			new ButtonBuilder()
 				.setCustomId(`chosen-map_${channelId}_${map.id}`)
-				.setLabel(`${map.Name}`)
+				.setLabel(`${map.name}`)
 				.setStyle(ButtonStyle.Primary),
 		);
 	}

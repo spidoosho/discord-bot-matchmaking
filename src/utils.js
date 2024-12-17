@@ -2,14 +2,6 @@ const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_
 const sqlDb = require('../src/sqliteDatabase.js');
 
 const { ChannelType } = require('discord.js');
-function isQueueInVoice(queueIds, voiceChannelMembers) {
-	for (const id of queueIds) {
-		if (!voiceChannelMembers.has(id)) {
-			return false;
-		}
-	}
-	return true;
-}
 
 /**
  * Gets highest permission role name based on database and discord roles
@@ -123,4 +115,4 @@ async function getGamesCategoryChannel(guild) {
 	}).then(channel => channel);
 }
 
-module.exports = { getHighestPermissionName, isQueueInVoice, splitCommand, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, selectMap, getGamesCategoryChannel };
+module.exports = { getHighestPermissionName, splitCommand, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, selectMap, getGamesCategoryChannel };

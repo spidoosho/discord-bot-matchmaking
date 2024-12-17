@@ -85,6 +85,7 @@ class VoiceLobby {
 	constructor(players, maps) {
 		this.players = players;
 		this.maps = maps;
+		this.mapVotes = {};
 	}
 }
 
@@ -97,10 +98,18 @@ class LobbyVoiceChannels {
 		 * @type {Object<string, VoiceLobby>}
 		 */
 		this.channels = {};
+		this.channelSwitch = {};
 	}
 
-	addLobby(id, voiceLobby) {
-		this.channels[id] = voiceLobby;
+	addLobby(voiceId, textId, voiceLobby) {
+		this.channels[voiceId] = voiceLobby;
+		this.channelSwitch[textId] = voiceId;
+	}
+
+	addVote(textId, playerId, mapId) {
+		const voiceLobby = this.channels[this.channelSwitch[textId]];
+
+		voiceLobby.mapVotes[playerId] = mapId;
 	}
 
 	cancelLobby(lobbyKey) {
@@ -110,8 +119,18 @@ class LobbyVoiceChannels {
 		return true;
 	}
 
-	isPlayerInLobby(id) {
-		return id in this.channels;
+	isPlayerInLobby(voiceId, playerId) {
+		if(!(voiceId in this.channels)) return false;
+
+		const voiceLobby = this.channels[voiceId];
+
+		for(const playerData of voiceLobby.players){
+			if(playerData.id === playerId) {
+				return true;
+			}
+		}
+		
+		return false;
 	}
 
 	lobbySubstitute(lobbyId, playerId, substitutePlayerData) {
@@ -129,8 +148,27 @@ class LobbyVoiceChannels {
 		return false;
 	}
 
+	removeLobby(voiceId) {
+		const lobby = this.channels[voiceId];
+		delete this.channels[voiceId];
+
+		const textId = this.channelSwitch[voiceId];
+		delete this.channelSwitch[voiceId];
+
+		return [textId, lobby];
+	}
+
 	getLobbyCount() {
 		return Object.keys(this.channels).length;
+	}
+}
+
+class Match {
+	constructor(voiceId, teams, map){
+		this.voiceId = voiceId;
+		this.teamOne = teams[0];
+		this.teamTwo = teams[1];
+		this.map = map;
 	}
 }
 
@@ -144,6 +182,13 @@ class OngoingMatches {
 
 		delete this.matches[matchKey];
 		return true;
+	}
+
+	addMatch(textId, voiceId, teams, map) {
+		const match = new Match(voiceId, teams, map);
+		this.matches[textId] = match;
+
+		return match;
 	}
 
 	getMatchCount() {

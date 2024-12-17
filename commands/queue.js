@@ -1,5 +1,4 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
-const { createLobby } = require('../src/game.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 const {
 	createSelectMenuMapPreferences,
@@ -129,31 +128,28 @@ function getUniqueLobbyName(interaction, players) {
 	return newLobbyName;
 }
 
-async function createLobbyChannels(lobby, interaction, matchmakingManager) {
+async function createLobby(interaction, sqlClient, matchmakingManager) {
 	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild);
 
 	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId)}`;
 
-	const voiceId = await interaction.member.guild.channels.create({
+	const voiceChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
 		type: ChannelType.GuildVoice,
 		parent: gameCategoryChannel.id,
-	}).then(channel => channel.id);
+	});
 
-	matchmakingManager.createLobby(interaction.guildId, interaction);
-
-	// creates a text channel for game info and for players to chat
+		// creates a text channel for game info and for players to chat
 	// send a message tagging players to join voice lobby channel
-	const textId = await interaction.member.guild.channels.create({
+	const textChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
 		type: ChannelType.GuildText,
 		parent: gameCategoryChannel.id,
-	}).then(channel => {
-		channel.send(`Players selected for this game: ${playersIdStr}`);
-		channel.send(createSelectMapMessage(mapNames, voiceId));
-		channel.send(`Please join <#${voiceId}> to start the game.`);
-		return channel.id;
 	});
 
-	return textId, voiceId;
+	const voiceLobby = await matchmakingManager.createLobby(interaction.guildId, voiceChannel.id, textChannel.id, sqlClient);
+
+	await textChannel.send(`Players selected for this game: `);
+	await textChannel.send(createSelectMapMessage(voiceLobby.maps, textChannel.id));
+	await textChannel.send(`Please join ${voiceChannel} to start the game.`);
 }
