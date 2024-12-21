@@ -53,6 +53,7 @@ module.exports = {
 		}
 
 		try {
+			console.log('execute');
 			await command.execute(interaction, splitCommand, args.sqlClient, args.matchmakingManager);
 		}
 		catch (error) {

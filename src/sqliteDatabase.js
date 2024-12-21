@@ -123,14 +123,10 @@ async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
 async function updatePlayersData(dbClient, serverId, playerDataArr) {
 	if (playerDataArr === undefined || playerDataArr.length === 0) return;
 
-	let sql = await dbClient.sql`USE DATABASE ${serverId};`;
+	let sql = `USE DATABASE ${serverId};`;
 
 	for (const player of playerDataArr) {
-		sql += `UPDATE Players
-                SET rating=${player.rating},
-                    games_won=${player.gamesWon},
-                    games_lost=${player.gamesLost}
-                WHERE id = ${player.id};`;
+		sql += `UPDATE Players SET rating=${player.rating}, games_won=${player.gamesWon}, games_lost=${player.gamesLost} WHERE id = ${player.id};`;
 	}
 
 	await dbClient.sql(sql);
@@ -181,7 +177,7 @@ async function getMapsDictByIdWithIndices(dbClient, serverId) {
 	const maps = await dbClient.sql`USE DATABASE ${serverId}; SELECT * FROM Maps`;
 
 	for (let i = 0; i < maps.length; i++) {
-		result[maps[i].id] = { index: i, name: maps[i].name };
+		result[maps[i].id] = { index: i, name: maps[i].name, id: maps[i].id };
 	}
 
 	return result;

@@ -1,5 +1,6 @@
-const { SlashCommandBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { VALOJS_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { getChannelByNameFromCategory } = require('../src/utils.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -20,9 +21,7 @@ module.exports = {
 		const reportedPlayer = interaction.options.getUser('user');
 		const reportReason = interaction.options.getString('reason');
 
-		const valojsCategoryChannel = interaction.guild.channels.cache.find(channel => channel.name === VALOJS_CATEGORY_CHANNEL && channel.type === ChannelType.GuildCategory);
-
-		const reportChannel = interaction.guild.channels.cache.find(channel => channel.name === 'reports' && channel.parentId === valojsCategoryChannel.id);
+		const reportChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_CATEGORY_CHANNEL, 'reports');
 
 		await reportChannel.send(`Player ${player} reported ${reportedPlayer} for: ${reportReason}`);
 

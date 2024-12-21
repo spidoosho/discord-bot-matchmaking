@@ -4,7 +4,7 @@ const {
 	createSelectMenuMapPreferences,
 } = require('../src/messages.js');
 const { createSelectMapMessage } = require('../src/messages');
-const { getGamesCategoryChannel } = require('../src/utils');
+const { getGamesCategoryChannel, getMentionPlayerMessage } = require('../src/utils');
 const { PlayerData } = require('../src/gameControllers.js');
 const { START_ELO } = require('../src/constants.js');
 
@@ -38,28 +38,30 @@ module.exports = {
 		const [playerData] = await getPlayerData(sqlClient, interaction, guildId);
 
 		// add player to queue
-		matchmakingManager.enqueuePlayer(guildId, playerData);
+		const [queueCount, canStartLobby] = matchmakingManager.enqueuePlayer(guildId, playerData);
 
 		// if there is enough players, start a lobby
-		if (matchmakingManager.isThereEnoughPlayersForMatch(guildId)) {
+		if (canStartLobby) {
 			await createLobby(interaction, sqlClient, matchmakingManager);
 		}
 
 		// return message to print
 		// skip missing map preference messages if command sent in direct messages
 		if (interaction.guildId === null) {
-			return interaction.reply(createQueueMessage(isPlayerNotInQueue, guildId));
+			return interaction.reply(createQueueMessage(isPlayerNotInQueue, queueCount, guildId));
 		}
 
-		await interaction.reply(createQueueMessage(isPlayerNotInQueue));
-		await getPlayerMapsPreferences(sqlClient, interaction, guildId, playerData);
+		await interaction.reply(createQueueMessage(isPlayerNotInQueue, queueCount));
+		await getPlayerMapsPreferences(sqlClient, interaction, playerData);
 	},
 };
 
 async function getPlayerMapsPreferences(sqlClient, interaction, playerData) {
 	const mapsPreferences = await sqlDb.getMapsPreferencesData(sqlClient, interaction.guildId, [playerData]);
 
-	const messages = createSelectMenuMapPreferences(mapsPreferences, false);
+	const messages = createSelectMenuMapPreferences(mapsPreferences, true);
+
+	if (messages.length === 0) return;
 
 	await interaction.followUp({
 		content: 'Please fill out all map preferences.',
@@ -88,7 +90,7 @@ async function getPlayerData(dbClient, interaction, guildId) {
 	return [playerData];
 }
 
-function createQueueMessage(wasSuccessful, guildId = undefined) {
+function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 	// add button to dequeue to the message
 	let id = '';
 	let ephemeral = true;
@@ -106,26 +108,13 @@ function createQueueMessage(wasSuccessful, guildId = undefined) {
 
 	let message;
 	if (wasSuccessful) {
-		message = 'You have joined the queue.';
+		message = `You have joined the queue. Players in queue: ${queueCount}.`;
 	}
 	else {
 		message = 'You are already in queue!';
 	}
 
 	return { content: message, components: [row], ephemeral };
-}
-
-function getUniqueLobbyName(interaction, players) {
-	// creates a temporary voice channel to gather chosen players
-	// get unique name by indexing channel
-	const playerName = players[Object.keys(players)[0]].displayName;
-	let newLobbyName = `game-${playerName}`;
-	let index = 0;
-	while (interaction.guild.channels.cache.find(channel => channel.name === newLobbyName)) {
-		newLobbyName = `game-${playerName}-${++index}`;
-	}
-
-	return newLobbyName;
 }
 
 async function createLobby(interaction, sqlClient, matchmakingManager) {
@@ -139,7 +128,7 @@ async function createLobby(interaction, sqlClient, matchmakingManager) {
 		parent: gameCategoryChannel.id,
 	});
 
-		// creates a text channel for game info and for players to chat
+	// creates a text channel for game info and for players to chat
 	// send a message tagging players to join voice lobby channel
 	const textChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
@@ -149,7 +138,7 @@ async function createLobby(interaction, sqlClient, matchmakingManager) {
 
 	const voiceLobby = await matchmakingManager.createLobby(interaction.guildId, voiceChannel.id, textChannel.id, sqlClient);
 
-	await textChannel.send(`Players selected for this game: `);
+	await textChannel.send(`Players selected for this game: ${getMentionPlayerMessage(voiceLobby.players)}.`);
 	await textChannel.send(createSelectMapMessage(voiceLobby.maps, textChannel.id));
 	await textChannel.send(`Please join ${voiceChannel} to start the game.`);
 }

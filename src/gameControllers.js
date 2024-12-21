@@ -80,12 +80,13 @@ class VoiceLobby {
 	/**
      * Creates a lobby.
      * @param {PlayerData[]} players - Array of players in the lobby.
-	 * @param {string[]} maps - Array of selected maps based on players.
+	 * @param {{id: number, name:string}[]} maps - Array of selected maps based on players.
      */
 	constructor(players, maps) {
 		this.players = players;
 		this.maps = maps;
 		this.mapVotes = {};
+		this.channelCategoryId;
 	}
 }
 
@@ -112,31 +113,34 @@ class LobbyVoiceChannels {
 		voiceLobby.mapVotes[playerId] = mapId;
 	}
 
-	cancelLobby(lobbyKey) {
-		if (!(lobbyKey in this.channels)) return false;
+	cancelLobby(textId) {
+		if (!(this.channelSwitch[textId] in this.channels)) return undefined;
 
-		delete this.channels[lobbyKey];
-		return true;
+		const voiceId = this.channelSwitch[textId];
+		delete this.channels[this.channelSwitch[textId]];
+		delete this.channelSwitch[textId];
+
+		return voiceId;
 	}
 
 	isPlayerInLobby(voiceId, playerId) {
-		if(!(voiceId in this.channels)) return false;
+		if (!(voiceId in this.channels)) return false;
 
 		const voiceLobby = this.channels[voiceId];
 
-		for(const playerData of voiceLobby.players){
-			if(playerData.id === playerId) {
+		for (const playerData of voiceLobby.players) {
+			if (playerData.id === playerId) {
 				return true;
 			}
 		}
-		
+
 		return false;
 	}
 
 	lobbySubstitute(lobbyId, playerId, substitutePlayerData) {
-		if (!(lobbyId in this.channels)) return undefined;
+		if (!(this.channelSwitch[lobbyId] in this.channels)) return undefined;
 
-		const voiceLobby = this.channels[lobbyId];
+		const voiceLobby = this.channels[this.channelSwitch[lobbyId]];
 
 		for (let i = 0; i < voiceLobby.players.length; i++) {
 			if (voiceLobby.players[i].id === playerId) {
@@ -152,23 +156,65 @@ class LobbyVoiceChannels {
 		const lobby = this.channels[voiceId];
 		delete this.channels[voiceId];
 
-		const textId = this.channelSwitch[voiceId];
-		delete this.channelSwitch[voiceId];
+		for (const [keyTextId, valueVoiceId] of Object.entries(this.channelSwitch)) {
+			if (valueVoiceId === voiceId) {
+				delete this.channelSwitch[keyTextId];
+				return [keyTextId, lobby];
+			}
+		}
 
-		return [textId, lobby];
+		return undefined;
 	}
 
 	getLobbyCount() {
 		return Object.keys(this.channels).length;
 	}
+
+	getPlayers(voiceId) {
+		return this.channels[voiceId].players;
+	}
 }
 
 class Match {
-	constructor(voiceId, teams, map){
+	constructor(textId, voiceId, teams, map, lobbyCreator) {
+		this.textId = textId;
 		this.voiceId = voiceId;
 		this.teamOne = teams[0];
 		this.teamTwo = teams[1];
 		this.map = map;
+		this.teamVoiceChannels = [];
+		this.submitId = undefined;
+		this.confirmId = undefined;
+		this.removedFromResult = new Set();
+		this.winnerId = undefined;
+		this.lobbyCreator = lobbyCreator;
+	}
+
+	getTeamNames() {
+		const result = { teamOne: undefined, teamTwo: undefined };
+
+		for (const voiceChannel of this.teamVoiceChannels) {
+			const splitName = voiceChannel.name.split('-');
+
+			if (splitName[splitName.length - 1] === '1') {
+				result.teamOne = voiceChannel.name;
+			}
+			else if (splitName[splitName.length - 1] === '2') {
+				result.teamTwo = voiceChannel.name;
+			}
+		}
+
+		return result;
+	}
+
+	getWinnerName() {
+		if (this.winnerId === undefined) return undefined;
+
+		const teamNames = this.getTeamNames();
+
+		if (this.winnerId == '1') return teamNames.teamOne;
+
+		return teamNames.teamTwo;
 	}
 }
 
@@ -177,15 +223,21 @@ class OngoingMatches {
 		this.matches = {};
 	}
 
-	cancelMatch(matchKey) {
-		if (!(matchKey in this.matches)) return false;
+	cancelMatch(textId) {
+		if (!(textId in this.matches)) return undefined;
 
-		delete this.matches[matchKey];
-		return true;
+		const voiceIds = [this.matches[textId].voiceId];
+		this.matches[textId].teamVoiceChannels.map(channel => {
+			voiceIds.push(channel.id);
+		});
+
+		delete this.matches[textId];
+
+		return voiceIds;
 	}
 
-	addMatch(textId, voiceId, teams, map) {
-		const match = new Match(voiceId, teams, map);
+	addMatch(textId, voiceId, teams, map, lobbyCreator) {
+		const match = new Match(textId, voiceId, teams, map, lobbyCreator);
 		this.matches[textId] = match;
 
 		return match;
@@ -194,6 +246,117 @@ class OngoingMatches {
 	getMatchCount() {
 		return Object.keys(this.matches).length;
 	}
+
+	canPlayerSetGameResult(gameId, playerId) {
+		if (!(gameId in this.matches)) return false;
+
+		const match = this.matches[gameId];
+		for (const player of match.teamOne.concat(match.teamTwo)) {
+			if (player.id === playerId) {
+				if (match.removedFromResult.has(playerId)) {
+					// player already voted
+					return false;
+				}
+
+				if (match.submitId !== undefined) {
+					// confirmId cannot be on the same team as submitId
+					return !arePlayersInTheSameTeam(match, match.submitId, playerId);
+				}
+
+				// player is in the match
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	setGameResultSubmitter(gameId, playerId, winnerId) {
+		function getOppositeTeam(id, match) {
+			for (const playerData of match.teamOne) {
+				if (playerData.id === id) return match.teamTwo;
+			}
+
+			return match.teamOne;
+		}
+		function getWinnerName(id, match) {
+			for (const voiceChannel of match.teamVoiceChannels) {
+				if (voiceChannel.name.includes(`team-${id}`)) return voiceChannel.name;
+			}
+
+			return undefined;
+		}
+		this.winnerId = winnerId;
+		this.matches[gameId].submitId = playerId;
+		this.matches[gameId].removedFromResult.add(playerId);
+
+		const oppositeTeam = getOppositeTeam(playerId, this.matches[gameId]);
+		const selectedTeamName = getWinnerName(winnerId, this.matches[gameId]);
+
+
+		return [selectedTeamName, oppositeTeam];
+	}
+
+	setMatchWinner(gameId, winnerTeamId, confirmId, playerConfirmed) {
+		const match = this.matches[gameId];
+
+		if (playerConfirmed) {
+			match.confirmId = confirmId;
+		}
+		else {
+			match.submitId = confirmId;
+		}
+
+		match.winnerId = winnerTeamId;
+
+		return match;
+	}
+
+	getMatch(gameId) {
+		if (!(gameId in this.matches)) return undefined;
+
+		return this.matches[gameId];
+	}
+
+	addVoiceChannels(gameId, voiceChannels) {
+		for (const voiceChannel of voiceChannels) {
+			this.matches[gameId].teamVoiceChannels.push({ name: voiceChannel.name, id: voiceChannel.id });
+		}
+	}
+
+	rejectMatchResult(gameId, playerId) {
+		const match = this.matches[gameId];
+
+		match.removedFromResult.add(playerId);
+		match.submitId = undefined;
+
+		if (match.removedFromResult.size <= 2) return true;
+
+		return false;
+	}
+}
+
+function arePlayersInTheSameTeam(match, playerOneId, playerTwoId) {
+	let inTeamOne = false;
+	let inTeamTwo = false;
+
+	for (const player of match.teamOne) {
+		if (player.id === playerOneId || player.id === playerTwoId) {
+			if (inTeamOne) return true;
+
+			inTeamOne = true;
+		}
+	}
+
+	for (const player of match.teamTwo) {
+		if (player.id === playerOneId || player.id === playerTwoId) {
+			if (inTeamTwo) return true;
+
+			inTeamTwo = true;
+		}
+	}
+
+	return false;
 }
 
 

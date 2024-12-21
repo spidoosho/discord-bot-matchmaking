@@ -7,7 +7,7 @@ module.exports = {
 		.setDescription('[Admins Only] Cancel ongoing match')
 		.addChannelOption(option =>
 			option.setName('channel')
-				.setDescription('game channel of the lobby')
+				.setDescription('text channel of the game')
 				.addChannelTypes(ChannelType.GuildText)
 				.setRequired(true))
 		.addStringOption(option =>
@@ -18,32 +18,27 @@ module.exports = {
 		const maxRole = await getHighestPermissionName(interaction, sqlClient);
 
 		if (maxRole === undefined) {
-			interaction.reply({ content: 'Only admins can execute this command!' });
+			interaction.reply({ content: 'Only admins can execute this command!', ephemeral: true });
 			return;
 		}
 
 		const channel = interaction.options.getChannel('channel');
 		const reason = interaction.options.getString('reason');
 
-		// TODO: Try this
-		const cancelled = matchmakingManager.cancelMatch(channel.name);
+		const voiceIds = matchmakingManager.cancelMatch(interaction.guildId, channel.id);
 
-		if (!cancelled) {
+		if (!voiceIds === undefined) {
 			return interaction.reply({ content: `Channel ${channel} is not a match`, ephemeral: true });
 		}
 
 		await interaction.reply({ content: `Match ${channel} cancelled.`, ephemeral: true });
+		await channel.send(`Match cancelled by ${interaction.user}. Reason: ${reason}. No ratings have been updated. Match channels will be deleted after 1 minute.`);
 
-		interaction.guild.channels.cache.forEach(async (chan) => {
-			if (chan.name.includes(channel.name)) return;
-
-			if (chan.type === ChannelType.GuildText) {
-				await channel.send(`Match cancelled by ${interaction.user}. Reason: ${reason}. No ratings have been updated. Match channels will be deleted after 1 minute`);
+		setTimeout(async () => {
+			await interaction.guild.channels.delete(channel);
+			for (const voiceId of voiceIds) {
+				await interaction.guild.channels.delete(voiceId);
 			}
-
-			setTimeout(async () => {
-				await interaction.guild.channels.delete(chan.id);
-			}, 60000);
-		});
+		}, 60000);
 	},
 };

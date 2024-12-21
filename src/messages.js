@@ -16,59 +16,6 @@ function createAutoDequeueMessage(guildId, userId) {
 	return { content: message, components: [row], ephemeral: true };
 }
 
-function randomSideSelection() {
-	const sides = {
-		teamOne: 'Attackers',
-		teamTwo: 'Defenders',
-	};
-
-	const rnd = Math.floor(Math.random() * 2);
-
-	if (rnd === 1) {
-		sides.teamOne = 'Defenders';
-		sides.teamTwo = 'Attackers';
-	}
-
-	return sides;
-}
-
-function createTeamsMessage(textChannelId, teams, teamOneName, teamTwoName, selectedMap) {
-	let teamOne = `<@${teams.teamOne[0].id.N}>`;
-	let teamTwo = `<@${teams.teamTwo[0].id.N}>`;
-
-	for (let i = 1; i < teams.teamOne.length; i++) {
-		teamOne += `\n<@${teams.teamOne[i].id.N}>`;
-		teamTwo += `\n<@${teams.teamTwo[i].id.N}>`;
-	}
-
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId(`set-game-result_${textChannelId}_1`)
-				.setLabel(`${teamOneName} won`)
-				.setStyle(ButtonStyle.Primary),
-		)
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId(`set-game-result_${textChannelId}_2`)
-				.setLabel(`${teamTwoName} won`)
-				.setStyle(ButtonStyle.Primary),
-		);
-
-	const sides = randomSideSelection();
-	const embed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle(`The game is ready. Chosen map is ${selectedMap}!`)
-		.setDescription('After the game please submit the winner')
-		.addFields(
-			{ name: `${sides.teamOne}: ${teamOneName}`, value: teamOne, inline: true },
-			{ name: `${sides.teamTwo}: ${teamTwoName}`, value: teamTwo, inline: true },
-		)
-		.setTimestamp();
-
-	return { embeds: [embed], components: [row] };
-}
-
 async function setPinnedQueueMessage(client, count) {
 	const title = `Currently in queue: ${count}`;
 	const row = new ActionRowBuilder()
@@ -113,38 +60,6 @@ function createSelectMapMessage(maps, channelId) {
 	return { embeds: [embed], components: [row] };
 }
 
-function createResultMessage(game, submitUserId) {
-	let teamOne = `<@${game.teamOne[0].id.N}>: ${game.teamOne[0].elo.N} (${getNumberStrWithOperand(game.teamOne[0].elo.N - game.teamOne[0].oldElo)})`;
-	let teamTwo = `<@${game.teamTwo[0].id.N}>: ${game.teamTwo[0].elo.N} (${getNumberStrWithOperand(game.teamTwo[0].elo.N - game.teamTwo[0].oldElo)})`;
-
-	for (let i = 1; i < game.teamOne.length; i++) {
-		teamOne += `\n<@${game.teamOne[i].id.N}>: ${game.teamOne[i].elo.N} (${getNumberStrWithOperand(game.teamOne[i].elo.N - game.teamOne[i].oldElo)})`;
-		teamTwo += `\n<@${game.teamTwo[i].id.N}>: ${game.teamTwo[i].elo.N} (${getNumberStrWithOperand(game.teamTwo[i].elo.N - game.teamTwo[i].oldElo)})`;
-	}
-
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId('command_queue')
-				.setLabel('Join the queue')
-				.setStyle(ButtonStyle.Primary),
-		);
-
-	game.map.Name.S = game.map.Name;
-	const updatePreferenceComponent = createMenuSelectRow(game.map, 'update-map-preference');
-	const embed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle(`Player <@${submitUserId}> selected team ${game.teamNames[game.winnerTeamId - 1]} as the winner!`)
-		.setDescription('Congratulations to the winners')
-		.addFields(
-			{ name: game.teamNames[0], value: teamOne, inline: true },
-			{ name: game.teamNames[1], value: teamTwo, inline: true },
-		)
-		.setTimestamp();
-
-	return { content: 'Game channels will be deleted in 1 minute.', embeds: [embed], components: [row, updatePreferenceComponent] };
-}
-
 function createMenuSelectRow(map, customId) {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId(`${customId}_${map.name}`)
@@ -164,7 +79,7 @@ function createResetMapsMessages(maps) {
 	let row = [];
 
 	for (const map of maps) {
-		let customId = 'update-map-preference';
+		let customId = 'reset-map-preference';
 		if (map.value === 0) {
 			customId = 'add-map-preference';
 		}
@@ -203,4 +118,4 @@ function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
 	return createResetMapsMessages(maps);
 }
 
-module.exports = { createAutoDequeueMessage, createTeamsMessage, setPinnedQueueMessage, createResultMessage, createSelectMenuMapPreferences, createSelectMapMessage };
+module.exports = { createAutoDequeueMessage, setPinnedQueueMessage, createSelectMenuMapPreferences, createSelectMapMessage };

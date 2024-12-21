@@ -1,4 +1,4 @@
-const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, MAP_CHANGE_THRESHOLD, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
+const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
 const { ChannelType } = require('discord.js');
@@ -62,16 +62,6 @@ function getPlayersId(teams) {
 	return ids;
 }
 
-/**
- * Splits input by '_' and the first is returned as flag and rest as params
- * @param {string} input string
- * @returns {{flag: string, params: [string]}} flag and parameters
- */
-function splitCommand(input) {
-	const split = input.split('_');
-	return { flag: split[0], params: split.splice(1) };
-}
-
 async function updateQueueCount(queue, interaction) {
 	const queueChannel = await interaction.guild.channels.fetch(QUEUE_CHANNEL_ID);
 	const message = await queueChannel.messages.fetch(MESSAGE_QUEUE_ID);
@@ -90,29 +80,65 @@ function addVoteForMap(lobbyVoiceChannels, params) {
 	}
 }
 
-function selectMap(maps) {
-	let chosenMap = maps[0];
+function getAverageTeamRating(playerDataArr) {
+	let sum = 0;
 
-	for (let i = 1; i < maps.length; i++) {
-		if (maps[i].count > chosenMap.count || (maps[i].count === chosenMap.count && Math.random() > MAP_CHANGE_THRESHOLD)) {
-			chosenMap = maps[i];
-		}
+	for (const player of playerDataArr) {
+		sum += player.rating;
 	}
-
-	return chosenMap;
+	return sum;
 }
 
 async function getGamesCategoryChannel(guild) {
-	const category = await guild.channels.cache.find(channel => channel.type === CATEGORY_CHANNEL_TYPE && channel.name === VALORANT_QUEUE_CATEGORY_NAME);
+	const channels = Array.from(guild.channels.cache.values());
+	channels.sort((a, b) => a.name.localeCompare(b.name));
 
-	if (category !== undefined) {
-		return category;
+	let maxCounter;
+	for (const channel of channels) {
+		if (channel.type !== ChannelType.GuildCategory) continue;
+
+		if (channel.name.includes(VALORANT_QUEUE_CATEGORY_NAME)) {
+			if (channel.children.cache.size < CATEGORY_MAX_CHANNEL_SIZE - 4) {
+				return channel;
+			}
+
+			const nameSplit = channel.name.split(' ');
+			maxCounter = nameSplit[nameSplit.length - 1];
+		}
+	}
+
+	if (maxCounter === undefined) {
+		maxCounter = 0;
 	}
 
 	return guild.channels.create({
-		name: VALORANT_QUEUE_CATEGORY_NAME,
+		name: `${VALORANT_QUEUE_CATEGORY_NAME} ${parseInt(maxCounter) + 1}`,
 		type: ChannelType.GuildCategory,
-	}).then(channel => channel);
+	});
 }
 
-module.exports = { getHighestPermissionName, splitCommand, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, selectMap, getGamesCategoryChannel };
+function getPlayersMentionString(team) {
+	let result = '';
+
+	for (const playerData of team) {
+		result += `<@${playerData.id}>, `;
+	}
+
+	return result.slice(0, result.length - 2);
+}
+
+function getChannelByNameFromCategory(guild, categoryName, channelName) {
+	const category = guild.channels.cache.find(channel => channel.name === categoryName && channel.type === ChannelType.GuildCategory);
+	return guild.channels.cache.find(channel => channel.name === channelName && channel.parentId === category.id);
+}
+
+function getMentionPlayerMessage(players) {
+	let str = '';
+	for (const player of players) {
+		str += `<@${player.id}>, `;
+	}
+
+	return str.slice(0, str.length - 2);
+}
+
+module.exports = { getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };

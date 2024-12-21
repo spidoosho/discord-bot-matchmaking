@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
+const { START_ELO } = require('../src/constants.js');
 const { PlayerData } = require('../src/gameControllers.js');
 
 module.exports = {
@@ -24,8 +25,7 @@ module.exports = {
 		const player = interaction.options.getUser('player');
 		const substitute = interaction.options.getUser('substitute');
 
-		// TODO: try this
-		const substitutePlayerData = getPlayerData(sqlClient, interaction);
+		const [substitutePlayerData] = await getPlayerData(sqlClient, interaction.guildId, substitute.id, substitute.username);
 		const isChannelLobby = matchmakingManager.lobbySubstitute(interaction.guildId, channel.id, player.id, substitutePlayerData);
 
 		if (!isChannelLobby) {
@@ -39,16 +39,16 @@ module.exports = {
 };
 
 // TODO move to src (queue.js vyuziva)
-async function getPlayerData(dbClient, interaction) {
+async function getPlayerData(dbClient, guildId, userId, username) {
 	let playerData = await sqlDb.getPlayerData(
 		dbClient,
-		interaction.guildId,
-		[interaction.user.id],
+		guildId,
+		[userId],
 	);
 
 	if (playerData.length === 0) {
-		playerData = new PlayerData(interaction.user.id, interaction.user.username, 0, 0, START_ELO);
-		await sqlDb.addPlayer(dbClient, interaction.guildId, playerData);
+		playerData = new PlayerData(userId, username, 0, 0, START_ELO);
+		await sqlDb.addPlayer(dbClient, guildId, playerData);
 	}
 
 	return playerData;
