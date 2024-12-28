@@ -1,13 +1,9 @@
 const path = require('node:path');
+const express = require('express');
+const bodyParser = require('body-parser');
+const leaderboard = require('./routes/leaderboard.js');
 
 function startExpress() {
-// Import packages
-	const express = require('express');
-	const bodyParser = require('body-parser');
-	const leaderboard = require('./routes/leaderboard.js');
-	const player = require('./routes/players.js');
-	const home = require('./routes/home.js');
-
 	// Middlewares
 	const app = express();
 	app.set('view engine', 'pug');
@@ -15,13 +11,13 @@ function startExpress() {
 
 	app.use(express.json());
 
+	app.use(express.static(path.join(__dirname, './static')));
+
 	app.use(bodyParser.urlencoded({ extended: false }));
 	app.use(bodyParser.json());
 
 	// Routes
-	app.use('/leaderboard', leaderboard);
-	app.use('/player', player);
-	app.use('/', home);
+	app.use('/', leaderboard);
 
 	// Connection
 	const port = process.env.PORT || 9001;

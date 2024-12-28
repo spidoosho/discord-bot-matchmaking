@@ -1,1 +1,1 @@
-exports.LEADERBOARD_TABLE_NAME = 'Leaderboard'
+exports.LEADERBOARD_TABLE_NAME = 'Leaderboard';

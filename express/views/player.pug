@@ -5,22 +5,19 @@ html
   body
     .container
       h1.text-center.my-4 Leaderboard
-      if leaderboard == null
-        p Leaderboard not found.
-      else if leaderboard.length == 0
-        p Leaderboard is empty.
+      if player == undefined
+        p Player was not found.
       else
         table.table.table-striped.table-bordered(style='width:100%', border='1')
           thead 
             tr
               th Username
-              th Elo
+              th Rating
               th Games won
               th Games lost
           tbody
-            each player in leaderboard
               tr
-                td #{player.displayName.S}
-                td #{player.elo.N}
-                td #{player.gamesWon.N}
-                td #{player.gamesLost.N}
+                td #{player.username}
+                td #{player.rating}
+                td #{player.gamesWon}
+                td #{player.gamesLost}
