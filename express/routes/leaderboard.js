@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const sqlDb = require('./../../src/sqliteDatabase.js');
 const { Database } = require('@sqlitecloud/drivers');
-const { getText } = require('../src/utils.js');
+const { getText, getPlayerDataFromDatabase } = require('../src/utils.js');
 const path = require('path');
 
 require('dotenv').config();
@@ -9,87 +9,104 @@ const router = Router();
 const dbclient = new Database(`${process.env.SQLITECLOUD_CONNECTION_STRING}?apikey=${process.env.SQLITECLOUD_API_KEY}`);
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Sends static website with usage.
  */
 router.get('/', async function(req, res) {
 	res.sendFile(path.join(__dirname, 'static', 'index.html'));
 });
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Renders a leaderboard based on server ID.
  */
 router.get('/:serverId', async function(req, res) {
-	const playersData = await sqlDb.getPlayerData(dbclient, req.params.serverId);
-	res.render('leaderboard', { playersData });
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId);
+
+	res.render('leaderboard', result);
 });
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Sends a JSON response with an array of player data sorted in descending rating order and leaderboard ID.
  */
 router.get('/:serverId/json', async function(req, res) {
-	const playersData = await sqlDb.getPlayerData(dbclient, req.params.serverId);
-	res.json(playersData);
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId);
+
+	res.json(result);
 });
 
 /**
- * Sends a JSON response with a string of a leaderboard
+ * Sends a text message about the leaderboard.
  */
 router.get('/:serverId/text', async function(req, res) {
-	const playersData = await sqlDb.getPlayerData(dbclient, req.params.serverId);
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId);
 
-	if (playersData === undefined) {
-		res.json('Leaderboard not found');
+	if (result.leaderboard === undefined) {
+		res.json('Leaderboard was not found.');
 		return;
 	}
 
-	if (playersData.length === 0) {
-		res.json('Leadeboard is empty');
+	if (result.playerDataArr.length === 0) {
+		res.json('Leadeboard is empty.');
 		return;
 	}
 
-	res.json(getText(playersData));
+	res.json(getText(result.playerDataArr));
 });
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Renders a player data.
  */
 router.get('/:serverId/:playerId', async function(req, res) {
-	const [playersData] = await sqlDb.getPlayerData(dbclient, req.params.serverId, [req.params.playerId]);
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
-	if (playersData === undefined) {
-		res.json('Player not found');
+	if (result.leaderboard === undefined || result.playerDataArr === undefined) {
+		res.render('player', result);
 		return;
 	}
 
-	res.render('player', { player: playersData[0] });
+	const [playerData] = result.playerDataArr;
+
+	res.render('player', { playerData, leaderboard: result.leaderboard });
 });
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Sends a JSON response with an player data and leadeboard ID.
  */
 router.get('/:serverId/:playerId/json', async function(req, res) {
-	const [playersData] = await sqlDb.getPlayerData(dbclient, req.params.serverId, [req.params.playerId]);
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
-	if (playersData === undefined) {
-		res.json('Player not found');
+	if (result.leaderboard === undefined || result.playerDataArr === undefined) {
+		res.json(result);
 		return;
 	}
 
-	res.json(playersData[0]);
+	const [playerData] = result.playerDataArr;
+
+	res.json({ playerData, leaderboard: result.leaderboard });
 });
 
 /**
- * Sends a JSON response with an array of players' data sorted in descending rating order
+ * Sends a text message with player data.
  */
 router.get('/:serverId/:playerId/text', async function(req, res) {
-	const [playersData] = await sqlDb.getPlayerData(dbclient, req.params.serverId, [req.params.playerId]);
+	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
-	if (playersData === undefined) {
-		res.json('Player not found');
+	if (result.leaderboard === undefined || result.playerDataArr === undefined) {
+		res.json(result);
 		return;
 	}
 
-	res.json(getText(playersData[0]));
+	if (result.leaderboard === undefined) {
+		res.json('Server was not found.');
+		return;
+	}
+
+	if (result.playerDataArr.length === 0) {
+		res.json('Player was not found.');
+		return;
+	}
+
+	const [playerData] = result.playerDataArr;
+	res.json(getText(playerData));
 });
 
 module.exports = router;

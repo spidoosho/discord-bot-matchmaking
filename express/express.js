@@ -3,6 +3,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const leaderboard = require('./routes/leaderboard.js');
 
+/**
+ * Starts Express REST API for ValoJS.
+ */
 function startExpress() {
 	// Middlewares
 	const app = express();
