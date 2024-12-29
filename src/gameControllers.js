@@ -1,5 +1,26 @@
 const { COUNT_PLAYERS_GAME } = require('./constants.js');
 
+class GuildSettings {
+	/**
+	 *
+	 * @param {{channelCategoryId:string|undefined, matchHistoryChannelId:string|undefined, generalChannelId:string|undefined, reportChannelId:string|undefined, adminRoleId:string|undefined, superAdminRoleId:string|undefined}} guildIds
+	 */
+	constructor(id, guildIds = undefined) {
+		if (guildIds === undefined) {
+			guildIds = {};
+		}
+		this.id = id;
+
+		this.channelCategoryId = guildIds.channelCategoryId;
+		this.matchHistoryChannelId = guildIds.matchHistoryChannelId;
+		this.generalChannelId = guildIds.generalChannelId;
+		this.reportChannelId = guildIds.reportChannelId;
+
+		this.adminRoleId = guildIds.adminRoleId;
+		this.superAdminRoleId = guildIds.superAdminRoleId;
+	}
+}
+
 /**
  * Player leaderboard data obtained from the database
  */
@@ -360,4 +381,4 @@ function arePlayersInTheSameTeam(match, playerOneId, playerTwoId) {
 }
 
 
-module.exports = { OngoingMatches, VoiceLobby, LobbyVoiceChannels, PlayersInQueue, PlayerData };
+module.exports = { OngoingMatches, VoiceLobby, LobbyVoiceChannels, PlayersInQueue, PlayerData, GuildSettings };

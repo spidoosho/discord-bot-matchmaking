@@ -14,7 +14,7 @@ async function getSuitableMaps(mapsPreferences) {
 	result.push(getFirstUniqueIndex(bestAverageArr, result));
 	result.push(getFirstUniqueIndex(bestPleasureArr, result));
 	*/
-	return [{ name:'Haven', id:2 }, { name:'Ascent', id:4 }, { name:'Split', id:3 }];
+	return [{ name:'Haven', id:2 }, { name:'Ascent', id:3 }, { name:'Split', id:1 }];
 }
 
 function getbestPleasureMapIndices(preferencesArr) {

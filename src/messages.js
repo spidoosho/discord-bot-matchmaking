@@ -1,6 +1,4 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
-const { QUEUE_CHANNEL_ID } = require('./constants.js');
-const { getNumberStrWithOperand } = require('./utils.js');
 const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 
 function createAutoDequeueMessage(guildId, userId) {
@@ -14,31 +12,6 @@ function createAutoDequeueMessage(guildId, userId) {
 	const message = `<@${userId}>, You have been dequeued because your status changed to offline and we do not know if you are still here.`;
 
 	return { content: message, components: [row], ephemeral: true };
-}
-
-async function setPinnedQueueMessage(client, count) {
-	const title = `Currently in queue: ${count}`;
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId('queue')
-				.setLabel('Join the queue')
-				.setStyle(ButtonStyle.Primary),
-		)
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId('dequeue')
-				.setLabel('Leave the queue')
-				.setStyle(ButtonStyle.Primary),
-		);
-
-	const exampleEmbed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle(title)
-		.setTimestamp();
-
-	const queueChannel = await client.channels.fetch(QUEUE_CHANNEL_ID);
-	await queueChannel.send({ content: '', embeds: [exampleEmbed], components: [row] });
 }
 
 function createSelectMapMessage(maps, channelId) {
@@ -118,4 +91,4 @@ function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
 	return createResetMapsMessages(maps);
 }
 
-module.exports = { createAutoDequeueMessage, setPinnedQueueMessage, createSelectMenuMapPreferences, createSelectMapMessage };
+module.exports = { createAutoDequeueMessage, createSelectMenuMapPreferences, createSelectMapMessage };

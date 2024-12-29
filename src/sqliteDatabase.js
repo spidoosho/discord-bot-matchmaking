@@ -1,6 +1,12 @@
 const fs = require('fs');
 const { PlayerData } = require('./gameControllers.js');
 const { START_ELO } = require('./constants.js');
+const { convertSnakeCaseToCamelCase } = require('./utils.js');
+
+async function getServerSettings(dbClient, serverId) {
+	const command = `USE DATABASE ${serverId}; SELECT * FROM Settings`;
+	return dbClient.sql(command);
+}
 
 /**
  * Create database and needed tables for the server
@@ -18,14 +24,14 @@ async function createDatabaseForServer(dbClient, serverId) {
  * @param {string} serverId serverId
  * @returns {Promise<Object<string, string>>} roles in database. key:roleName, value:roleId
  */
-async function getDatabaseRoles(dbClient, serverId) {
-	const command = `USE DATABASE ${serverId}; SELECT * FROM Roles;`;
+async function getGuildSettings(dbClient, serverId) {
+	const command = `USE DATABASE ${serverId}; SELECT * FROM Settings;`;
 
 	const roles = await dbClient.sql(command);
 	const result = {};
 
 	for (const role of roles) {
-		result[role.name] = role.id;
+		result[convertSnakeCaseToCamelCase(role.name)] = role.id;
 	}
 
 	return result;
@@ -126,7 +132,20 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 	let sql = `USE DATABASE ${serverId};`;
 
 	for (const player of playerDataArr) {
-		sql += `UPDATE Players SET rating=${player.rating}, games_won=${player.gamesWon}, games_lost=${player.gamesLost} WHERE id = ${player.id};`;
+		let updates = '';
+
+		for (const key in player) {
+			if (player[key] === undefined || key === 'id') continue;
+
+			updates += `${key}='${player[key]}',`;
+		}
+
+		if (updates.length === 0) return;
+
+		updates = updates.slice(0, updates.length - 1);
+		updates = updates.replace('gamesWon', 'games_won').replace('gamesLost', 'games_lost');
+
+		sql += `UPDATE Players SET ${updates} WHERE id = ${player.id};`;
 	}
 
 	await dbClient.sql(sql);
@@ -279,4 +298,4 @@ async function removePlayerFromDatabase(guildId, dbClient, memberId) {
 	await dbClient.sql(query);
 }
 
-module.exports = { getDatabases, removePlayerFromDatabase, getDatabaseRoles, resetLeaderboard, addMap, removeMap, addPlayerMapPreference, addOrUpdateRoles, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };
+module.exports = { getDatabases, removePlayerFromDatabase, getGuildSettings, resetLeaderboard, addMap, removeMap, addPlayerMapPreference, addOrUpdateRoles, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };

@@ -2,7 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = re
 
 module.exports = {
 	data: new SlashCommandBuilder()
-		.setName('dequeue')
+		.setName('leave-queue')
 		.setDescription('Remove from the queue.'),
 	/**
 	 *
@@ -12,8 +12,6 @@ module.exports = {
 	 * @return {Promise<*>}
 	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		console.log('[DEBUG]: executing dequeue');
-
 		let guildId = interaction.guildId;
 		if (guildId === null) {
 			guildId = args[0];
@@ -33,7 +31,7 @@ function createDequeueMessage(wasSuccessful, interaction, guildId) {
 	// add button to queue to the message
 	let message;
 	if (wasSuccessful) {
-		message = 'You have been dequeued.';
+		message = 'You have left the queue.';
 	}
 	else {
 		message = 'You are not in queue!';

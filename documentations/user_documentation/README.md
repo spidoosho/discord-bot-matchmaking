@@ -29,7 +29,7 @@ You will learn how to add and use Discord bot to your Discord server. You can al
 Discord bot will check if you already filled out your map preferences. If any of your map preference is missing, then you will be requested to fill them out. After successful queue command call with all map preferences filled out beforehand, you will be added to the queue.
 > You can only join the queue with full map preference submitted beforehand.
 
-### `/dequeue`
+### `/leave-queue`
 
 You will be removed from the queue.
 

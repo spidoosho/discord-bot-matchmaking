@@ -1,7 +1,7 @@
 const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
-const { ChannelType } = require('discord.js');
+const { ChannelType, PermissionsBitField } = require('discord.js');
 
 /**
  * Gets highest permission role name based on database and discord roles
@@ -114,6 +114,16 @@ async function getGamesCategoryChannel(guild) {
 	return guild.channels.create({
 		name: `${VALORANT_QUEUE_CATEGORY_NAME} ${parseInt(maxCounter) + 1}`,
 		type: ChannelType.GuildCategory,
+		permissionOverwrites: [
+			{
+				id: guild.id,
+				deny: [PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: '1322612015474147429',
+				allow: [PermissionsBitField.Flags.ManageChannels],
+			},
+		],
 	});
 }
 
@@ -141,4 +151,8 @@ function getMentionPlayerMessage(players) {
 	return str.slice(0, str.length - 2);
 }
 
-module.exports = { getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };
+function convertSnakeCaseToCamelCase(snakeStr) {
+	return snakeStr.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+module.exports = { convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };

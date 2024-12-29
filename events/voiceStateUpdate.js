@@ -1,4 +1,4 @@
-const { Events, ChannelType, ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle } = require('discord.js');
+const { Events, ChannelType, ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
 const { setSideSelection } = require('../src/game.js');
 const db = require('../src/sqliteDatabase.js');
@@ -27,7 +27,7 @@ module.exports = {
 			const [textId, match] = args.matchmakingManager.startMatch(newState.guild.id, newState.channelId, playerMapsPreferences);
 			const textChannel = newState.guild.channels.cache.get(textId);
 
-			const [teamOneVoice, teamTwoVoice] = await createTeamChannelsAndMovePlayers(newState.guild, match, newState.channel);
+			const [teamOneVoice, teamTwoVoice] = await createTeamChannelsAndMovePlayers(newState.guild, match, newState.channel, args.dcClient.user.id);
 			args.matchmakingManager.addVoiceChannelsToMatch(newState.guild.id, textId, [teamOneVoice, teamTwoVoice]);
 			await textChannel.send(createMatchMessage(match, teamOneVoice, teamTwoVoice, textId));
 			await textChannel.send(createInGameLobbyCreatorMessage(match.lobbyCreator));
@@ -46,16 +46,36 @@ function isQueueInVoice(players, voiceChannelMembers) {
 	return true;
 }
 
-async function createTeamChannelsAndMovePlayers(guild, match, voiceChannel) {
+async function createTeamChannelsAndMovePlayers(guild, match, voiceChannel, botId) {
 	const teamOneVoice = await guild.channels.create({
 		name: `${voiceChannel.name}-team-1`,
 		type: ChannelType.GuildVoice,
+		permissionOverwrites: [
+			{
+				id: guild.id,
+				deny: [PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: botId,
+				allow: [PermissionsBitField.Flags.ManageChannels],
+			},
+		],
 		parent: voiceChannel.parentId,
 	}).then(channel => channel);
 
 	const teamTwoVoice = await guild.channels.create({
 		name: `${voiceChannel.name}-team-2`,
 		type: ChannelType.GuildVoice,
+		permissionOverwrites: [
+			{
+				id: guild.id,
+				deny: [PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: botId,
+				allow: [PermissionsBitField.Flags.ManageChannels],
+			},
+		],
 		parent: voiceChannel.parentId,
 	}).then(channel => channel);
 

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitField, ButtonStyle, ChannelType } = require('discord.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 const {
 	createSelectMenuMapPreferences,
@@ -42,7 +42,7 @@ module.exports = {
 
 		// if there is enough players, start a lobby
 		if (canStartLobby) {
-			await createLobby(interaction, sqlClient, matchmakingManager);
+			await createLobby(interaction, sqlClient, matchmakingManager, interaction.applicationId);
 		}
 
 		// return message to print
@@ -101,7 +101,7 @@ function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 	const row = new ActionRowBuilder()
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`command_dequeue_${id}`)
+				.setCustomId(`command_leave-queue_${id}`)
 				.setLabel('Leave the queue')
 				.setStyle(ButtonStyle.Primary),
 		);
@@ -117,7 +117,7 @@ function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 	return { content: message, components: [row], ephemeral };
 }
 
-async function createLobby(interaction, sqlClient, matchmakingManager) {
+async function createLobby(interaction, sqlClient, matchmakingManager, botId) {
 	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild);
 
 	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId)}`;
@@ -125,6 +125,16 @@ async function createLobby(interaction, sqlClient, matchmakingManager) {
 	const voiceChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
 		type: ChannelType.GuildVoice,
+		permissionOverwrites: [
+			{
+				id: interaction.guildId,
+				deny: [PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: botId,
+				allow: [PermissionsBitField.Flags.ManageChannels],
+			},
+		],
 		parent: gameCategoryChannel.id,
 	});
 
@@ -133,6 +143,16 @@ async function createLobby(interaction, sqlClient, matchmakingManager) {
 	const textChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
 		type: ChannelType.GuildText,
+		permissionOverwrites: [
+			{
+				id: interaction.guildId,
+				deny: [PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: botId,
+				allow: [PermissionsBitField.Flags.ManageChannels],
+			},
+		],
 		parent: gameCategoryChannel.id,
 	});
 

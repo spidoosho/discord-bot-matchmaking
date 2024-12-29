@@ -2,10 +2,12 @@ CREATE TABLE Maps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL
 );
-CREATE TABLE Roles (
+
+CREATE TABLE Settings (
     name TEXT PRIMARY KEY,
     id TEXT UNIQUE
 );
+
 CREATE TABLE Players (
     id TEXT PRIMARY KEY,
     username TEXT UNIQUE,
@@ -14,6 +16,7 @@ CREATE TABLE Players (
     games_lost INT,
     matches_created INT
 );
+
 CREATE TABLE MapsPreferences (
     id_player TEXT,
     id_map INTEGER,

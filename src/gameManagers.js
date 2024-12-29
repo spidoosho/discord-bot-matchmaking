@@ -1,4 +1,4 @@
-const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby } = require('./gameControllers');
+const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby, GuildSettings } = require('./gameControllers');
 const { getSuitableMaps, splitPlayers, selectMap, updatePlayerData, selectInGameLobbyCreator } = require('../src/game.js');
 
 const db = require('../src/sqliteDatabase.js');
@@ -15,8 +15,12 @@ class MatchmakingManager {
 		this.guildManagers = {};
 	}
 
-	addGuild(id) {
-		this.guildManagers[id] = new GuildManager(id);
+	addGuild(id, guildSettings) {
+		this.guildManagers[id] = new GuildManager(id, guildSettings);
+	}
+
+	getGuildSettings(id) {
+		return this.guildManagers[id].guildSettings;
 	}
 
 	isPlayerInQueue(guildId, playerId) {
@@ -106,15 +110,11 @@ class GuildManager {
 	 * Creates a guild manager
 	 * @param {Number} id - guild Id
 	 */
-	constructor(id) {
+	constructor(id, guildSettings) {
 		/**
-		 * @type {Number}
+		 * @type {GuildSettings}
 		 */
-		this.guildId = id;
-		/**
-		 * @type {Number}
-		 */
-		this.lobbyId = 0;
+		this.guildSettings = new GuildSettings(id, guildSettings);
 		/**
 		 * @type {PlayersInQueue}
 		 */
