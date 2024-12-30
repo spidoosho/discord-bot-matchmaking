@@ -9,9 +9,7 @@ module.exports = {
 	name: Events.GuildRoleUpdate,
 	async execute(args) {
 		const [oldRole, newRole] = args.args;
-
-		// TODO fetch admin roles
-		const adminRoles = { admin: 123, superAdmin: 456 };
+		const adminRoles = args.matchmakingManager.getGuildIds(newRole.guild.id);
 
 		// check if admin roles are mentionable
 		if (Object.values(adminRoles).includes(newRole.id) && !newRole.mentionable) {
@@ -21,7 +19,7 @@ module.exports = {
 		}
 
 		// if not bot role or if permissions did not change, then skip
-		if (newRole.tags === undefined || !('botId' in newRole.tags) || oldRole.permissions.equals(newRole.permissions)) {
+		if (newRole.tags === null || !('botId' in newRole.tags) || oldRole.permissions.equals(newRole.permissions)) {
 			return;
 		}
 

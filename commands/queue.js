@@ -2,7 +2,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitFiel
 const sqlDb = require('../src/sqliteDatabase.js');
 const {
 	createSelectMenuMapPreferences,
-} = require('../src/messages.js');
+} = require('../src/messageComponents.js');
 const { createSelectMapMessage } = require('../src/messages');
 const { getGamesCategoryChannel, getMentionPlayerMessage } = require('../src/utils');
 const { PlayerData } = require('../src/gameControllers.js');

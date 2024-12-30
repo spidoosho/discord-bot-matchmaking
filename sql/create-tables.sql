@@ -3,9 +3,9 @@ CREATE TABLE Maps (
     name TEXT NOT NULL
 );
 
-CREATE TABLE Settings (
-    name TEXT PRIMARY KEY,
-    id TEXT UNIQUE
+CREATE TABLE GuildIds (
+    id TEXT PRIMARY KEY,
+    name TEXT UNIQUE
 );
 
 CREATE TABLE Players (

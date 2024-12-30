@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { createSelectMenuMapPreferences } = require('../src/messages.js');
+const { createSelectMenuMapPreferences } = require('../src/messageComponents.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 const { PlayerData } = require('../src/gameControllers.js');
 

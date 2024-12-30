@@ -1,5 +1,8 @@
-const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby, GuildSettings } = require('./gameControllers');
-const { getSuitableMaps, splitPlayers, selectMap, updatePlayerData, selectInGameLobbyCreator } = require('../src/game.js');
+const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby, GuildIds } = require('./gameControllers');
+const { updatePlayerRating } = require('../src/playerRating.js');
+const { getSuitableMaps, selectMap } = require('../src/mapSelection.js');
+const { splitPlayers, selectLobbyCreator } = require('../src/playerSelection.js');
+const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
 
 const db = require('../src/sqliteDatabase.js');
 
@@ -15,12 +18,18 @@ class MatchmakingManager {
 		this.guildManagers = {};
 	}
 
-	addGuild(id, guildSettings) {
-		this.guildManagers[id] = new GuildManager(id, guildSettings);
+	addGuild(id, guildIds) {
+		this.guildManagers[id] = new GuildManager(id, guildIds);
 	}
 
-	getGuildSettings(id) {
-		return this.guildManagers[id].guildSettings;
+	removeGuild(id) {
+		if (!(id in this.guildManagers)) return;
+
+		delete this.guildManagers[id];
+	}
+
+	getGuildIds(id) {
+		return this.guildManagers[id].guildIds;
 	}
 
 	isPlayerInQueue(guildId, playerId) {
@@ -110,11 +119,11 @@ class GuildManager {
 	 * Creates a guild manager
 	 * @param {Number} id - guild Id
 	 */
-	constructor(id, guildSettings) {
+	constructor(id, guildIds) {
 		/**
-		 * @type {GuildSettings}
+		 * @type {GuildIds}
 		 */
-		this.guildSettings = new GuildSettings(id, guildSettings);
+		this.guildIds = new GuildIds(id, guildIds);
 		/**
 		 * @type {PlayersInQueue}
 		 */
@@ -155,7 +164,8 @@ class GuildManager {
 	async createLobby(guildId, voiceId, textId, dbClient) {
 		const playersArr = this.playersInQueue.extractPlayers();
 		const mapsPreferences = db.getMapsPreferencesData(dbClient, guildId, playersArr);
-		const maps = await getSuitableMaps(mapsPreferences);
+		const matchHistory = {};
+		const maps = await getSuitableMaps(mapsPreferences, matchHistory);
 
 		const voiceLobby = new VoiceLobby(playersArr, maps);
 		this.voiceChannelLobbies.addLobby(voiceId, textId, voiceLobby);
@@ -190,9 +200,9 @@ class GuildManager {
 	startMatch(voiceId, playerMapsPreferences) {
 		const [textId, voiceLobby] = this.voiceChannelLobbies.removeLobby(voiceId);
 
-		const teams = splitPlayers(voiceLobby.players);
+		const teams = splitPlayers(voiceLobby.players, COUNT_PLAYERS_GAME);
 		const mapId = selectMap(voiceLobby.maps, Object.values(voiceLobby.mapVotes));
-		const lobbyCreator = selectInGameLobbyCreator(voiceLobby.players);
+		const lobbyCreator = selectLobbyCreator(voiceLobby.players);
 		const map = playerMapsPreferences.maps[mapId];
 
 		return [textId, this.ongoingMatches.addMatch(textId, voiceId, teams, map, lobbyCreator)];
@@ -231,6 +241,40 @@ class GuildManager {
 	rejectMatchResult(gameId, playerId) {
 		return this.ongoingMatches.rejectMatchResult(gameId, playerId);
 	}
+}
+
+function updatePlayerData(match, winnerTeamId) {
+	const result = { teamOne: [], teamTwo: [] };
+
+	let teamOneResult = 1;
+	let teamTwoResult = 0;
+
+	if (winnerTeamId != '1') {
+		teamOneResult = 0;
+		teamTwoResult = 1;
+	}
+
+	let teamOneRatingAvg = 0;
+	let teamTwoRatingAvg = 0;
+	for (let i = 0; i < match.teamOne.length; i++) {
+		teamOneRatingAvg += match.teamOne[i].rating;
+		teamTwoRatingAvg += match.teamTwo[i].rating;
+	}
+
+	teamOneRatingAvg /= match.teamOne.length;
+	teamTwoRatingAvg /= match.teamTwo.length;
+
+	for (const player of match.teamOne) {
+		const newRating = updatePlayerRating(player.rating, teamTwoRatingAvg, teamOneResult, player.gamesWon + player.gamesLost);
+		result.teamOne.push(new PlayerData(player.id, player.username, player.gamesWon + teamOneResult, player.gamesLost + teamTwoResult, newRating));
+	}
+
+	for (const player of match.teamTwo) {
+		const newRating = updatePlayerRating(player.rating, teamOneRatingAvg, teamTwoResult, player.gamesWon + player.gamesLost);
+		result.teamTwo.push(new PlayerData(player.id, player.username, player.gamesWon + teamTwoResult, player.gamesLost + teamOneResult, newRating));
+	}
+
+	return result;
 }
 
 module.exports = { MatchmakingManager };

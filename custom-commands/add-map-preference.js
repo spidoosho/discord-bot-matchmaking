@@ -1,5 +1,3 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const { getPlayerDataFromDb } = require('../src/database.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
 module.exports = {

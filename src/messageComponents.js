@@ -1,19 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 
-function createAutoDequeueMessage(guildId, userId) {
-	const row = new ActionRowBuilder()
-		.addComponents(
-			new ButtonBuilder()
-				.setCustomId(`command_queue_${guildId}`)
-				.setLabel('Join the queue while being offline')
-				.setStyle(ButtonStyle.Primary),
-		);
-	const message = `<@${userId}>, You have been dequeued because your status changed to offline and we do not know if you are still here.`;
-
-	return { content: message, components: [row], ephemeral: true };
-}
-
 function createSelectMapMessage(maps, channelId) {
 	const embed = new EmbedBuilder()
 		.setColor(0x0099FF)
@@ -91,4 +78,4 @@ function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
 	return createResetMapsMessages(maps);
 }
 
-module.exports = { createAutoDequeueMessage, createSelectMenuMapPreferences, createSelectMapMessage };
+module.exports = { createSelectMenuMapPreferences, createSelectMapMessage };

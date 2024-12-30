@@ -1,6 +1,6 @@
 const { COUNT_PLAYERS_GAME } = require('./constants.js');
 
-class GuildSettings {
+class GuildIds {
 	/**
 	 *
 	 * @param {{channelCategoryId:string|undefined, matchHistoryChannelId:string|undefined, generalChannelId:string|undefined, reportChannelId:string|undefined, adminRoleId:string|undefined, superAdminRoleId:string|undefined}} guildIds
@@ -104,9 +104,21 @@ class VoiceLobby {
 	 * @param {{id: number, name:string}[]} maps - Array of selected maps based on players.
      */
 	constructor(players, maps) {
+		/**
+		 * @type {PlayerData[]}
+		 */
 		this.players = players;
+		/**
+		 * @type {{id: number, name:string}[]}
+		 */
 		this.maps = maps;
+		/**
+		 * @type {Object<string, number>} playerId: mapId
+		 */
 		this.mapVotes = {};
+		/**
+		 * @type {string}
+		 */
 		this.channelCategoryId;
 	}
 }
@@ -117,9 +129,12 @@ class LobbyVoiceChannels {
 	 */
 	constructor() {
 		/**
-		 * @type {Object<string, VoiceLobby>}
+		 * @type {Object<string, VoiceLobby>} voiceId: VoiceLobby
 		 */
 		this.channels = {};
+		/**
+		 * @type {Object<string, VoiceLobby>} textId: VoiceLobby
+		 */
 		this.channelSwitch = {};
 	}
 
@@ -241,6 +256,9 @@ class Match {
 
 class OngoingMatches {
 	constructor() {
+		/**
+		 * @type {Object<string, Match>} textId: Match
+		 */
 		this.matches = {};
 	}
 
@@ -381,4 +399,4 @@ function arePlayersInTheSameTeam(match, playerOneId, playerTwoId) {
 }
 
 
-module.exports = { OngoingMatches, VoiceLobby, LobbyVoiceChannels, PlayersInQueue, PlayerData, GuildSettings };
+module.exports = { OngoingMatches, VoiceLobby, LobbyVoiceChannels, PlayersInQueue, PlayerData, GuildIds };

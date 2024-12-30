@@ -1,6 +1,5 @@
 const { Events } = require('discord.js');
 const { OFFLINE_STATUS } = require('../src/constants.js');
-const { createAutoDequeueMessage } = require('../src/messages.js');
 
 /**
  * Emitted whenever a guild member's presence (e.g. status, activity) is changed.
@@ -23,3 +22,16 @@ module.exports = {
 		await newPresence.user.send(createAutoDequeueMessage(newPresence.guild.id, newPresence.userId));
 	},
 };
+
+function createAutoDequeueMessage(guildId, userId) {
+	const row = new ActionRowBuilder()
+		.addComponents(
+			new ButtonBuilder()
+				.setCustomId(`command_queue_${guildId}`)
+				.setLabel('Join the queue while being offline')
+				.setStyle(ButtonStyle.Primary),
+		);
+	const message = `<@${userId}>, You have been dequeued because your status changed to offline and we do not know if you are still here.`;
+
+	return { content: message, components: [row], ephemeral: true };
+}

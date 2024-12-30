@@ -1,7 +1,7 @@
 const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
-const { ChannelType, PermissionsBitField } = require('discord.js');
+const { ChannelType, PermissionsBitField, Guild } = require('discord.js');
 
 /**
  * Gets highest permission role name based on database and discord roles
@@ -155,4 +155,54 @@ function convertSnakeCaseToCamelCase(snakeStr) {
 	return snakeStr.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-module.exports = { convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };
+function convertCamelCaseToSnakeCase(camelStr) {
+	return camelStr.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+/**
+ *
+ * @param {Guild} guild
+ * @param {MatchmakingManager} matchmakingManager
+ */
+function getAdminRoles(guild, matchmakingManager) {
+	const guildIds = matchmakingManager.getGuildIds(guild.id);
+	const adminRoles = { };
+
+	const adminRole = guild.roles.cache.get(cachedRole => cachedRole.key === guildIds.adminRoleId);
+	const superAdminRole = guild.roles.cache.get(cachedRole => cachedRole.key === guildIds.superAdminRoleId);
+
+	if (adminRole !== undefined) {
+		adminRoles[adminRole.name] = adminRole.id;
+	}
+
+	if (superAdminRole !== undefined) {
+		adminRoles[superAdminRole.name] = superAdminRole.id;
+	}
+
+	return adminRoles;
+}
+
+async function createReadOnlyChannel(guild, channelName, categoryChannel, botRoleId, type) {
+	return guild.channels.create({
+		name: channelName,
+		type,
+		parent: categoryChannel,
+		permissionOverwrites: [
+			{
+				id: guild.roles.everyone.id,
+				deny: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels],
+			},
+			{
+				id: botRoleId,
+				allow: [PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.ManageChannels],
+			},
+		],
+	});
+}
+
+function getClientMaxRolePosition(client, guild) {
+	const clientMember = guild.members.cache.find(member => member.id == client.user.id);
+	return clientMember.roles.botRole.position;
+}
+
+module.exports = { createReadOnlyChannel, getClientMaxRolePosition, getAdminRoles, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };

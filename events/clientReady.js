@@ -1,5 +1,6 @@
-const { Events, Colors, ChannelType, PermissionsBitField } = require('discord.js');
+const { Events, Colors, ChannelType } = require('discord.js');
 const { startExpress } = require('../express/express.js');
+const { getClientMaxRolePosition, createReadOnlyChannel } = require('../src/utils.js');
 const db = require('../src/sqliteDatabase.js');
 
 const { SUPER_ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_NAME, ADMIN_ROLE_CREATE_REASON, VALOJS_CATEGORY_CHANNEL } = require('../src/constants.js');
@@ -18,15 +19,18 @@ module.exports = {
 				await db.createDatabaseForServer(args.sqlClient, guildId);
 			}
 
-			const dbSettings = await db.getGuildSettings(args.sqlClient, guildId);
-			args.matchmakingManager.addGuild(guildId, dbSettings);
-			let guildSettings = args.matchmakingManager.getGuildSettings(guildId);
+			// TODO: check permissions
+
+			const guildDbIds = await db.getGuildDbIds(args.sqlClient, guildId);
+			args.matchmakingManager.addGuild(guildId, guildDbIds);
+			let guildIds = args.matchmakingManager.getGuildIds(guildId);
 
 			// check if role in database is the same as in the server
-			guildSettings = await checkForAdminRoles(client, guild, guildSettings);
-			await assignRolesToOwner(guild, guildSettings);
+			guildIds = await checkForAdminRoles(client, guild, guildIds);
+			await assignRolesToOwner(guild, guildIds);
 
-			guildSettings = await checkValoJSCategories(guild);
+			guildIds = await checkValoJSCategories(guild, guildIds);
+			await db.updateGuildIds(args.sqlClient, guildId, guildIds);
 		}
 
 		// start REST API
@@ -34,12 +38,12 @@ module.exports = {
 	},
 };
 
-async function checkForAdminRoles(client, guild, guildSettings) {
+async function checkForAdminRoles(client, guild, guildIds) {
 	// max possible role position for a role created by the bot
 	let clientMaxRolePosition;
 
-	if (guildSettings.superAdminRoleId === undefined ||
-		guild.roles.cache.find(role => role.id === guildSettings.superAdminRoleId) === undefined) {
+	if (guildIds.superAdminRoleId === undefined ||
+		guild.roles.cache.find(role => role.id === guildIds.superAdminRoleId) === undefined) {
 
 		if (clientMaxRolePosition === undefined) {
 			clientMaxRolePosition = getClientMaxRolePosition(client, guild);
@@ -53,12 +57,12 @@ async function checkForAdminRoles(client, guild, guildSettings) {
 			position: clientMaxRolePosition,
 		});
 
-		guildSettings.superAdminRoleId = superAdminRole.id;
+		guildIds.superAdminRoleId = superAdminRole.id;
 	}
 
 
-	if (guildSettings.adminRoleId === undefined ||
-		guild.roles.cache.find(role => role.id === guildSettings.adminRoleId) === undefined) {
+	if (guildIds.adminRoleId === undefined ||
+		guild.roles.cache.find(role => role.id === guildIds.adminRoleId) === undefined) {
 
 		if (clientMaxRolePosition === undefined) {
 			clientMaxRolePosition = getClientMaxRolePosition(client, guild);
@@ -72,98 +76,56 @@ async function checkForAdminRoles(client, guild, guildSettings) {
 			position: clientMaxRolePosition,
 		});
 
-		guildSettings.adminRoleId = adminRole.id;
+		guildIds.adminRoleId = adminRole.id;
 	}
 
-	return guildSettings;
+	return guildIds;
 }
 
-async function assignRolesToOwner(guild, guildSettings) {
+async function assignRolesToOwner(guild, guildIds) {
 	const owner = await guild.fetchOwner();
 
-	if (!owner.roles.cache.has(guildSettings.superAdminRoleId)) {
-		owner.roles.add(guildSettings.superAdminRoleId);
+	if (!owner.roles.cache.has(guildIds.superAdminRoleId)) {
+		owner.roles.add(guildIds.superAdminRoleId);
 	}
 
-	if (!owner.roles.cache.has(guildSettings.adminRoleId)) {
-		owner.roles.add(guildSettings.adminRoleId);
+	if (!owner.roles.cache.has(guildIds.adminRoleId)) {
+		owner.roles.add(guildIds.adminRoleId);
 	}
 }
 
-async function checkValoJSCategories(guild, guildSettings) {
+async function checkValoJSCategories(guild, guildIds) {
 	const clientBotRole = guild.members.cache.find(member => member.id === guild.client.user.id).roles.botRole;
-	let valojsCategoryChannel = guild.channels.cache.find(channel => channel.name === VALOJS_CATEGORY_CHANNEL && channel.type === ChannelType.GuildCategory);
+	let valojsCategoryChannel = guild.channels.cache.find(channel => channel.id === guildIds.channelCategoryId && channel.type === ChannelType.GuildCategory);
 	let generalChannel;
-	let historyChannel;
-	let reportsChannel;
+	let matchHistoryChannel;
+	let reportChannel;
 
 	if (valojsCategoryChannel === undefined) {
-		valojsCategoryChannel = await guild.channels.create({
-			name: VALOJS_CATEGORY_CHANNEL,
-			type: ChannelType.GuildCategory,
-			permissionOverwrites: [
-				{
-					id: guild.roles.everyone.id,
-					deny: [PermissionsBitField.SendMessages],
-				},
-				{
-					id: clientBotRole.id,
-					allow: [PermissionsBitField.SendMessages],
-				},
-				{
-					id: guild.roles.everyone.id,
-					deny: [PermissionsBitField.Flags.ManageChannels],
-				},
-				{
-					id: clientBotRole.id,
-					allow: [PermissionsBitField.Flags.ManageChannels],
-				},
-			],
-		});
-		valojsCategoryChannel = createReadOnlyChannel(guild, VALOJS_CATEGORY_CHANNEL, undefined, clientBotRole.id, ChannelType.GuildCategory);
-
+		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_CATEGORY_CHANNEL, undefined, clientBotRole.id, ChannelType.GuildCategory);
+	}
+	else {
+		generalChannel = guild.channels.cache.find(channel => channel.id === guildIds.generalChannelId && channel.parentId === valojsCategoryChannel.id);
+		matchHistoryChannel = guild.channels.cache.find(channel => channel.id === guildIds.matchHistoryChannelId && channel.parentId === valojsCategoryChannel.id);
+		reportChannel = guild.channels.cache.find(channel => channel.id === guildIds.reportChannelId && channel.parentId === valojsCategoryChannel.id);
 	}
 
-	const matchHistoryChannel = guild.channels.cache.find(channel => channel.name === 'match-history' && channel.parentId === valojsCategoryChannel.id);
-	const reportChannel = guild.channels.cache.find(channel => channel.name === 'reports' && channel.parentId === valojsCategoryChannel.id);
+	if (generalChannel === undefined) {
+		generalChannel = await createReadOnlyChannel(guild, 'general', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+	}
 
 	if (matchHistoryChannel === undefined) {
-		await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+		matchHistoryChannel = await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
 	}
 
 	if (reportChannel === undefined) {
-		await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+		reportChannel = await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
 	}
 
-	const general = await createReadOnlyChannel(guild, 'general', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
-	const history = await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
-	const reports = await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+	guildIds.generalChannelId = generalChannel.id;
+	guildIds.matchHistoryChannelId = matchHistoryChannel.id;
+	guildIds.reportChannelId = reportChannel.id;
+	guildIds.channelCategoryId = valojsCategoryChannel.id;
 
-	guildSettings.generalChannelId = general.id;
-	guildSettings.matchHistoryChannelId = history.id;
-	guildSettings.reportChannelId = reports.id;
-	return guildSettings;
-}
-
-async function createReadOnlyChannel(guild, channelName, categoryChannel, botRoleId, type) {
-	return guild.channels.create({
-		name: channelName,
-		type,
-		parent: categoryChannel,
-		permissionOverwrites: [
-			{
-				id: guild.roles.everyone.id,
-				deny: [PermissionsBitField.SendMessages, PermissionsBitField.Flags.ManageChannels],
-			},
-			{
-				id: botRoleId,
-				allow: [PermissionsBitField.SendMessages, PermissionsBitField.Flags.ManageChannels],
-			},
-		],
-	});
-}
-
-function getClientMaxRolePosition(client, guild) {
-	const clientMember = guild.members.cache.find(member => member.id == client.user.id);
-	return clientMember.roles.botRole.position;
+	return guildIds;
 }

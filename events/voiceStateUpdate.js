@@ -1,6 +1,6 @@
 const { Events, ChannelType, ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
 const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
-const { setSideSelection } = require('../src/game.js');
+const { setSideSelection } = require('../src/playerSelection.js');
 const db = require('../src/sqliteDatabase.js');
 
 /**
