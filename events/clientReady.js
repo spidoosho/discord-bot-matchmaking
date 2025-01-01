@@ -3,34 +3,43 @@ const { startExpress } = require('../express/express.js');
 const { getClientMaxRolePosition, createReadOnlyChannel } = require('../src/utils.js');
 const db = require('../src/sqliteDatabase.js');
 
-const { SUPER_ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_NAME, ADMIN_ROLE_CREATE_REASON, VALOJS_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { SUPER_ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_NAME, ADMIN_ROLE_CREATE_REASON, VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
 
 module.exports = {
 	name: Events.ClientReady,
 	once: true,
-	async execute(args) {
-		const [client] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		// client already passed from parameters
+		// const [client] = args;
 
 		// all the servers in the database
-		const databaseGuildIds = await db.getDatabases(args.sqlClient);
+		const databaseGuildIds = await db.getDatabases(sqlClient);
 
 		for (const [guildId, guild] of client.guilds.cache) {
 			if (!databaseGuildIds.has(guildId)) {
-				await db.createDatabaseForServer(args.sqlClient, guildId);
+				await db.createDatabaseForServer(sqlClient, guildId);
 			}
 
 			// TODO: check permissions
 
-			const guildDbIds = await db.getGuildDbIds(args.sqlClient, guildId);
-			args.matchmakingManager.addGuild(guildId, guildDbIds);
-			let guildIds = args.matchmakingManager.getGuildIds(guildId);
+			const guildDbIds = await db.getGuildDbIds(sqlClient, guildId);
+			matchmakingManager.addGuild(guildId, guildDbIds);
+			let guildIds = matchmakingManager.getGuildIds(guildId);
 
 			// check if role in database is the same as in the server
 			guildIds = await checkForAdminRoles(client, guild, guildIds);
 			await assignRolesToOwner(guild, guildIds);
 
 			guildIds = await checkValoJSCategories(guild, guildIds);
-			await db.updateGuildIds(args.sqlClient, guildId, guildIds);
+			await db.updateGuildIds(sqlClient, guildId, guildIds);
 		}
 
 		// start REST API
@@ -102,7 +111,7 @@ async function checkValoJSCategories(guild, guildIds) {
 	let reportChannel;
 
 	if (valojsCategoryChannel === undefined) {
-		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_CATEGORY_CHANNEL, undefined, clientBotRole.id, ChannelType.GuildCategory);
+		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_MAIN_CATEGORY_CHANNEL, undefined, clientBotRole.id, ChannelType.GuildCategory);
 	}
 	else {
 		generalChannel = guild.channels.cache.find(channel => channel.id === guildIds.generalChannelId && channel.parentId === valojsCategoryChannel.id);

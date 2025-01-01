@@ -1,7 +1,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { Database } = require('@sqlitecloud/drivers');
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, GatewayIntentBits } = require('discord.js');
 const { REST, Routes } = require('discord.js');
 const { MatchmakingManager } = require('./src/gameManagers.js');
 require('dotenv').config();
@@ -59,10 +59,10 @@ for (const file of eventFiles) {
 	const filePath = path.join(eventsPath, file);
 	const event = require(filePath);
 	if (event.once) {
-		dcClient.once(event.name, (...args) => event.execute({ args, dcClient, sqlClient, matchmakingManager }));
+		dcClient.once(event.name, (...args) => event.execute(args, dcClient, sqlClient, matchmakingManager));
 	}
 	else {
-		dcClient.on(event.name, (...args) => event.execute({ args, dcClient, sqlClient, matchmakingManager }));
+		dcClient.on(event.name, (...args) => event.execute(args, dcClient, sqlClient, matchmakingManager));
 	}
 }
 

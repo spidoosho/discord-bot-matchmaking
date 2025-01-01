@@ -1,4 +1,4 @@
-const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, CATEGORY_CHANNEL_TYPE, VALORANT_QUEUE_CATEGORY_NAME } = require('./constants.js');
+const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME } = require('./constants.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 
 const { ChannelType, PermissionsBitField, Guild } = require('discord.js');
@@ -97,7 +97,7 @@ async function getGamesCategoryChannel(guild) {
 	for (const channel of channels) {
 		if (channel.type !== ChannelType.GuildCategory) continue;
 
-		if (channel.name.includes(VALORANT_QUEUE_CATEGORY_NAME)) {
+		if (channel.name.includes(VALOJS_GAME_CATEGORY_NAME)) {
 			if (channel.children.cache.size < CATEGORY_MAX_CHANNEL_SIZE - 4) {
 				return channel;
 			}
@@ -112,7 +112,7 @@ async function getGamesCategoryChannel(guild) {
 	}
 
 	return guild.channels.create({
-		name: `${VALORANT_QUEUE_CATEGORY_NAME} ${parseInt(maxCounter) + 1}`,
+		name: `${VALOJS_GAME_CATEGORY_NAME} ${parseInt(maxCounter) + 1}`,
 		type: ChannelType.GuildCategory,
 		permissionOverwrites: [
 			{

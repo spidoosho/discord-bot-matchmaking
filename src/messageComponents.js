@@ -1,25 +1,6 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 
-function createSelectMapMessage(maps, channelId) {
-	const embed = new EmbedBuilder()
-		.setColor(0x0099FF)
-		.setTitle('Select map to play before joining voice channel.');
-
-	const row = new ActionRowBuilder();
-
-	for (const map of maps) {
-		row.addComponents(
-			new ButtonBuilder()
-				.setCustomId(`chosen-map_${channelId}_${map.id}`)
-				.setLabel(`${map.name}`)
-				.setStyle(ButtonStyle.Primary),
-		);
-	}
-
-	return { embeds: [embed], components: [row] };
-}
-
 function createMenuSelectRow(map, customId) {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId(`${customId}_${map.name}`)
@@ -78,4 +59,4 @@ function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
 	return createResetMapsMessages(maps);
 }
 
-module.exports = { createSelectMenuMapPreferences, createSelectMapMessage };
+module.exports = { createSelectMenuMapPreferences };

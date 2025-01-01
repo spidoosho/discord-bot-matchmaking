@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder } = require('discord.js');
 const { getHighestPermissionName } = require('../src/utils.js');
-const { VALOJS_CATEGORY_CHANNEL, ADMIN_ROLE_NAME } = require('../src/constants.js');
+const { VALOJS_MAIN_CATEGORY_CHANNEL, ADMIN_ROLE_NAME } = require('../src/constants.js');
 const { getChannelByNameFromCategory, getMentionPlayerMessage } = require('../src/utils.js');
 
 const db = require('../src/sqliteDatabase.js');
@@ -33,7 +33,7 @@ module.exports = {
 		await db.updatePlayersData(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(playerDataAfter.teamTwo));
 
 		await interaction.reply(createResultMessage(matchResult, playerDataBefore, playerDataAfter));
-		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_CATEGORY_CHANNEL, 'match-history');
+		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'match-history');
 
 		await matchHistoryChannel.send(createMatchHistoryMessage(matchResult));
 

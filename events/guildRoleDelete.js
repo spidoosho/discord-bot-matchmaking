@@ -8,10 +8,18 @@ const db = require('../src/sqliteDatabase');
  */
 module.exports = {
 	name: Events.GuildRoleDelete,
-	async execute(args) {
-		const [role] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [role] = args;
 
-		const guildIds = args.matchmakingManager.getGuildIds(role.guild.id);
+		const guildIds = matchmakingManager.getGuildIds(role.guild.id);
 
 		// check if admin roles are mentionable
 		if (![guildIds.superAdminRoleId, guildIds.adminRoleId].includes(role.id)) return;
@@ -26,7 +34,7 @@ module.exports = {
 			if (log.targetId !== role.id) continue;
 
 			// deleted by the Bot
-			if (log.executorId === args.dcClient.user.id) return;
+			if (log.executorId === client.user.id) return;
 
 			// create replacement admin role
 			const newAdminRole = await createMissingAdminRole(role, guildIds);
@@ -36,7 +44,7 @@ module.exports = {
 			else {
 				guildIds.superAdminRoleId = newAdminRole.id;
 			}
-			await db.updateGuildIds(args.sqlClient, role.guild.id, guildIds);
+			await db.updateGuildIds(sqlClient, role.guild.id, guildIds);
 
 			const owner = await role.guild.fetchOwner();
 			return owner.send(`Warning! An admin Role ${role.name} in a server ${role.guild.name} was deleted. A replacement admin role ${newAdminRole.name} has been created. Please review the Audit Log and make sure it will not happen again. Admin roles are vital for ValoJS conflict resolution.`);

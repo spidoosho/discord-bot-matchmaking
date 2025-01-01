@@ -2,7 +2,7 @@ const { COUNT_PLAYERS_GAME } = require('./constants.js');
 
 class GuildIds {
 	/**
-	 *
+	 * @param {string} id guildId
 	 * @param {{channelCategoryId:string|undefined, matchHistoryChannelId:string|undefined, generalChannelId:string|undefined, reportChannelId:string|undefined, adminRoleId:string|undefined, superAdminRoleId:string|undefined}} guildIds
 	 */
 	constructor(id, guildIds = undefined) {
@@ -133,7 +133,7 @@ class LobbyVoiceChannels {
 		 */
 		this.channels = {};
 		/**
-		 * @type {Object<string, VoiceLobby>} textId: VoiceLobby
+		 * @type {Object<string, string>} textId: VoiceLobby
 		 */
 		this.channelSwitch = {};
 	}
@@ -248,7 +248,7 @@ class Match {
 
 		const teamNames = this.getTeamNames();
 
-		if (this.winnerId == '1') return teamNames.teamOne;
+		if (this.winnerId === '1') return teamNames.teamOne;
 
 		return teamNames.teamTwo;
 	}
@@ -369,9 +369,7 @@ class OngoingMatches {
 		match.removedFromResult.add(playerId);
 		match.submitId = undefined;
 
-		if (match.removedFromResult.size <= 2) return true;
-
-		return false;
+		return match.removedFromResult.size <= 2;
 	}
 }
 

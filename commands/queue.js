@@ -1,9 +1,8 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitField, ButtonStyle, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitField, ButtonStyle, ChannelType, EmbedBuilder } = require('discord.js');
 const sqlDb = require('../src/sqliteDatabase.js');
 const {
 	createSelectMenuMapPreferences,
 } = require('../src/messageComponents.js');
-const { createSelectMapMessage } = require('../src/messages');
 const { getGamesCategoryChannel, getMentionPlayerMessage } = require('../src/utils');
 const { PlayerData } = require('../src/gameControllers.js');
 const { START_ELO } = require('../src/constants.js');
@@ -161,4 +160,23 @@ async function createLobby(interaction, sqlClient, matchmakingManager, botId) {
 	await textChannel.send(`Players selected for this game: ${getMentionPlayerMessage(voiceLobby.players)}.`);
 	await textChannel.send(createSelectMapMessage(voiceLobby.maps, textChannel.id));
 	await textChannel.send(`Please join ${voiceChannel} to start the game.`);
+}
+
+function createSelectMapMessage(maps, channelId) {
+	const embed = new EmbedBuilder()
+		.setColor(0x0099FF)
+		.setTitle('Select map to play before joining voice channel.');
+
+	const row = new ActionRowBuilder();
+
+	for (const map of maps) {
+		row.addComponents(
+			new ButtonBuilder()
+				.setCustomId(`chosen-map_${channelId}_${map.id}`)
+				.setLabel(`${map.name}`)
+				.setStyle(ButtonStyle.Primary),
+		);
+	}
+
+	return { embeds: [embed], components: [row] };
 }

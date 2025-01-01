@@ -8,9 +8,17 @@ const db = require('../src/sqliteDatabase.js');
  */
 module.exports = {
 	name: Events.GuildMemberRemove,
-	async execute(args) {
-		const [member] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [member] = args;
 
-		await db.removePlayerFromDatabase(member.guild.id, args.sqlClient, member.id);
+		await db.removePlayerFromDatabase(member.guild.id, sqlClient, member.id);
 	},
 };

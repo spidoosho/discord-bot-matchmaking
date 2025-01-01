@@ -18,10 +18,16 @@ CREATE TABLE Players (
 );
 
 CREATE TABLE MapsPreferences (
-    id_player TEXT,
-    id_map INTEGER,
+    player_id TEXT,
+    map_id INTEGER,
     value REAL,
-    PRIMARY KEY (id_player, id_map),
+    PRIMARY KEY (player_id, map_id),
     FOREIGN KEY (id_player) REFERENCES Players (id),
-    FOREIGN KEY (id_map) REFERENCES Maps (id)
+    FOREIGN KEY (map_id) REFERENCES Maps (id)
 );
+
+CREATE TABLE MapHistory {
+    player_id TEXT,
+    map_count INTEGER,
+    map_id INTEGER
+}

@@ -7,17 +7,16 @@ const { COMMAND } = require('../src/constants.js');
  */
 module.exports = {
 	name: Events.InteractionCreate,
-
 	/**
-	 *
-	 * @param {*} interaction
-	 * @param {Client} client
-	 * @param {DynamoDBClient} dbclient
-	 * @param {MatchmakingManager} matchmakingManager
-	 * @returns
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
 	 */
-	async execute(args) {
-		const [interaction] = args.args;
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [interaction] = args;
 
 		let command = null;
 		let splitCommand;
@@ -33,11 +32,11 @@ module.exports = {
 			if (splitCommand[0] === COMMAND) {
 				// button interaction is a command
 				splitCommand.shift();
-				command = args.dcClient.commands.get(splitCommand[0]);
+				command = client.commands.get(splitCommand[0]);
 			}
 			else {
 				// custom command
-				command = args.dcClient.customCommands.get(splitCommand[0]);
+				command = client.customCommands.get(splitCommand[0]);
 			}
 
 			splitCommand.shift();
@@ -49,12 +48,12 @@ module.exports = {
 			}
 
 			// command interaction
-			command = args.dcClient.commands.get(interaction.commandName);
+			command = client.commands.get(interaction.commandName);
 		}
 
 		try {
 			console.log('execute');
-			await command.execute(interaction, splitCommand, args.sqlClient, args.matchmakingManager);
+			await command.execute(interaction, splitCommand, sqlClient, matchmakingManager);
 		}
 		catch (error) {
 			console.error(error);

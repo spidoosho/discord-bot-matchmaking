@@ -9,17 +9,25 @@ const { PlayerData } = require('../src/gameControllers.js');
  */
 module.exports = {
 	name: Events.UserUpdate,
-	async execute(args) {
-		const [oldUser, newUser] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [oldUser, newUser] = args;
 
 		if (oldUser.username === newUser.username) return;
 
-		const clientGuilds = args.dcClient.guilds.cache;
+		const clientGuilds = client.guilds.cache;
 		for (const guild of clientGuilds.values()) {
 			if (!guild.members.cache.has(newUser.id)) continue;
 
 			const player = new PlayerData(newUser.id, newUser.username);
-			await db.updatePlayersData(args.sqlClient, guild.id, [player]);
+			await db.updatePlayersData(sqlClient, guild.id, [player]);
 		}
 	},
 };

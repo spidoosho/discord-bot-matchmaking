@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { OFFLINE_STATUS } = require('../src/constants.js');
 
 /**
@@ -9,16 +9,24 @@ const { OFFLINE_STATUS } = require('../src/constants.js');
  */
 module.exports = {
 	name: Events.PresenceUpdate,
-	async execute(args) {
-		const [oldPresence, newPresence] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [oldPresence, newPresence] = args;
 
 		// check if user went offline and if is in queue
-		if (newPresence.status !== OFFLINE_STATUS || !(args.matchmakingManager.isPlayerInQueue(newPresence.guild.id, newPresence.userId))) {
+		if (newPresence.status !== OFFLINE_STATUS || !(matchmakingManager.isPlayerInQueue(newPresence.guild.id, newPresence.userId))) {
 			return;
 		}
 
 		// remove from queue
-		args.matchmakingManager.dequeuePlayer(newPresence.guild.id, newPresence.userId);
+		matchmakingManager.dequeuePlayer(newPresence.guild.id, newPresence.userId);
 		await newPresence.user.send(createAutoDequeueMessage(newPresence.guild.id, newPresence.userId));
 	},
 };

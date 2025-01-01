@@ -7,9 +7,17 @@ const { BOT_PERMISSIONS } = require('../src/constants.js');
  */
 module.exports = {
 	name: Events.GuildRoleUpdate,
-	async execute(args) {
-		const [oldRole, newRole] = args.args;
-		const adminRoles = args.matchmakingManager.getGuildIds(newRole.guild.id);
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [oldRole, newRole] = args;
+		const adminRoles = matchmakingManager.getGuildIds(newRole.guild.id);
 
 		// check if admin roles are mentionable
 		if (Object.values(adminRoles).includes(newRole.id) && !newRole.mentionable) {

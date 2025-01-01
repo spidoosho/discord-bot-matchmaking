@@ -11,24 +11,32 @@ const db = require('../src/sqliteDatabase.js');
  */
 module.exports = {
 	name: Events.VoiceStateUpdate,
-	async execute(args) {
-		const [oldState, newState] = args.args;
+	/**
+	 * Handles the emitted event.
+	 * @param {any[]} args arguments passed from the event
+	 * @param {Client} client Discord client
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<void>}
+	 */
+	async execute(args, client, sqlClient, matchmakingManager) {
+		const [oldState, newState] = args;
 
 		// check only connections to lobby voice channel
 		// check if enough players are in the channel
 		if (newState.channelId === null
-			|| !args.matchmakingManager.isPlayerInLobby(newState.guild.id, newState.channelId, newState.member.id)
+			|| !matchmakingManager.isPlayerInLobby(newState.guild.id, newState.channelId, newState.member.id)
 			|| newState.channel.members.size < COUNT_PLAYERS_GAME) return;
 
-		const players = args.matchmakingManager.getPlayers(newState.guild.id, newState.channelId);
+		const players = matchmakingManager.getPlayers(newState.guild.id, newState.channelId);
 
 		if (isQueueInVoice(players, newState.channel.members)) {
-			const playerMapsPreferences = await db.getMapsPreferencesData(args.sqlClient, newState.guild.id, players);
-			const [textId, match] = args.matchmakingManager.startMatch(newState.guild.id, newState.channelId, playerMapsPreferences);
+			const playerMapsPreferences = await db.getMapsPreferencesData(sqlClient, newState.guild.id, players);
+			const [textId, match] = matchmakingManager.startMatch(newState.guild.id, newState.channelId, playerMapsPreferences);
 			const textChannel = newState.guild.channels.cache.get(textId);
 
-			const [teamOneVoice, teamTwoVoice] = await createTeamChannelsAndMovePlayers(newState.guild, match, newState.channel, args.dcClient.user.id);
-			args.matchmakingManager.addVoiceChannelsToMatch(newState.guild.id, textId, [teamOneVoice, teamTwoVoice]);
+			const [teamOneVoice, teamTwoVoice] = await createTeamChannelsAndMovePlayers(newState.guild, match, newState.channel, client.user.id);
+			matchmakingManager.addVoiceChannelsToMatch(newState.guild.id, textId, [teamOneVoice, teamTwoVoice]);
 			await textChannel.send(createMatchMessage(match, teamOneVoice, teamTwoVoice, textId));
 			await textChannel.send(createInGameLobbyCreatorMessage(match.lobbyCreator));
 		}
