@@ -14,20 +14,22 @@ CREATE TABLE Players (
     rating INT,
     games_won INT,
     games_lost INT,
-    matches_created INT
+    accumulated_share REAL
 );
 
-CREATE TABLE MapsPreferences (
+CREATE TABLE MapPreferences (
     player_id TEXT,
     map_id INTEGER,
     value REAL,
     PRIMARY KEY (player_id, map_id),
-    FOREIGN KEY (id_player) REFERENCES Players (id),
+    FOREIGN KEY (player_id) REFERENCES Players (id),
     FOREIGN KEY (map_id) REFERENCES Maps (id)
 );
 
-CREATE TABLE MapHistory {
+CREATE TABLE MapHistory (
     player_id TEXT,
     map_count INTEGER,
-    map_id INTEGER
-}
+    map_id INTEGER,
+    FOREIGN KEY (player_id) REFERENCES Players (id),
+    FOREIGN KEY (map_id) REFERENCES Maps (id)
+);

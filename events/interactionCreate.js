@@ -52,7 +52,6 @@ module.exports = {
 		}
 
 		try {
-			console.log('execute');
 			await command.execute(interaction, splitCommand, sqlClient, matchmakingManager);
 		}
 		catch (error) {

@@ -32,13 +32,17 @@ class PlayerData {
 	 * @param {number} gamesWon - Number of games won in total.
 	 * @param {number} gamesLost - Number of games lost in total.
 	 * @param {number} rating - Player current rating
+	 * @param {number} accumulatedShare - Player accumulated share of map relevances
      */
-	constructor(id, username = undefined, gamesLost = undefined, gamesWon = undefined, rating = undefined) {
+	constructor(id, username = undefined, gamesLost = undefined, gamesWon = undefined, rating = undefined, accumulatedShare = undefined, mapShare = undefined) {
 		this.id = id;
 		this.rating = rating;
 		this.gamesLost = gamesLost;
 		this.gamesWon = gamesWon;
 		this.username = username;
+		this.accumulatedShare = accumulatedShare;
+		this.mapShare = mapShare;
+		this.matrixIndex = undefined;
 	}
 }
 
@@ -146,7 +150,10 @@ class LobbyVoiceChannels {
 	addVote(textId, playerId, mapId) {
 		const voiceLobby = this.channels[this.channelSwitch[textId]];
 
+		if (!voiceLobby) return false;
+
 		voiceLobby.mapVotes[playerId] = mapId;
+		return true;
 	}
 
 	cancelLobby(textId) {
@@ -173,7 +180,7 @@ class LobbyVoiceChannels {
 		return false;
 	}
 
-	lobbySubstitute(lobbyId, playerId, substitutePlayerData) {
+	substitutePlayer(lobbyId, playerId, substitutePlayerData) {
 		if (!(this.channelSwitch[lobbyId] in this.channels)) return undefined;
 
 		const voiceLobby = this.channels[this.channelSwitch[lobbyId]];
@@ -204,6 +211,14 @@ class LobbyVoiceChannels {
 
 	getLobbyCount() {
 		return Object.keys(this.channels).length;
+	}
+
+	getLobby(voiceId) {
+		return this.channels[voiceId];
+	}
+
+	getLobbyByTextId(textId) {
+		return this.channels[this.channelSwitch[textId]];
 	}
 
 	getPlayers(voiceId) {
@@ -282,6 +297,12 @@ class OngoingMatches {
 		return match;
 	}
 
+	removeMatch(textId) {
+		if (!(textId in this.matches)) return;
+
+		delete this.matches[textId];
+	}
+
 	getMatchCount() {
 		return Object.keys(this.matches).length;
 	}
@@ -325,6 +346,9 @@ class OngoingMatches {
 
 			return undefined;
 		}
+
+		if (this.matches[gameId].submitId) return [undefined];
+
 		this.winnerId = winnerId;
 		this.matches[gameId].submitId = playerId;
 		this.matches[gameId].removedFromResult.add(playerId);

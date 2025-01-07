@@ -5,15 +5,17 @@ module.exports = {
 		.setName('leave-queue')
 		.setDescription('Remove from the queue.'),
 	/**
-	 *
-	 * @param interaction
-	 * @param sqlClient
-	 * @param {MatchmakingManager} matchmakingManager
-	 * @return {Promise<*>}
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
 	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		let guildId = interaction.guildId;
 		if (guildId === null) {
+			// command was executed in direct messages
 			guildId = args[0];
 		}
 

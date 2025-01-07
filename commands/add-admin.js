@@ -11,22 +11,29 @@ module.exports = {
 			option.setName('user')
 				.setDescription('new admin user')
 				.setRequired(true)),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		const maxRole = await getHighestPermissionName(interaction, sqlClient);
+		const dbRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
+		const maxRole = getHighestPermissionName(interaction, dbRoles);
 
 		if (maxRole !== SUPER_ADMIN_ROLE_NAME) {
 			interaction.reply({ content: 'Only Super Admins can execute this command!', ephemeral: true });
 			return;
 		}
 
-		const dbRoles = await db.getDatabaseRoles(sqlClient, interaction.guildId);
 		if (!(ADMIN_ROLE_NAME in dbRoles)) {
 			interaction.reply({ content: 'Cannot find Admin role to be assigned!', ephemeral: true });
 			return;
 		}
 
-		const user = interaction.options.getUser('user');
-		const member = interaction.guild.members.cache.find(target => target.id === user.id);
+		const member = interaction.options.getMember('user');
 
 		if (member.roles.cache.has(dbRoles[ADMIN_ROLE_NAME])) {
 			return interaction.reply({ content: `Member <@${member.id}> is already a <@&${dbRoles[ADMIN_ROLE_NAME]}>.`, ephemeral: true });

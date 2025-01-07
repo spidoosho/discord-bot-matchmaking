@@ -55,7 +55,6 @@ module.exports = {
     .setName('example')
     .setDescription('This is a description for the example command.'),
   async execute (input) {
-    console.log('[DEBUG]: executing example')
 
     // command logic 
     // ...

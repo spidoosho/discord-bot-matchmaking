@@ -1,5 +1,5 @@
 const { Events, ChannelType, ActionRowBuilder, ButtonBuilder, EmbedBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
-const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
+const { COUNT_PLAYERS_GAME, TEAM_ATTACKERS_NAME, TEAM_DEFENDERS_NAME } = require('../src/constants.js');
 const { setSideSelection } = require('../src/playerSelection.js');
 const db = require('../src/sqliteDatabase.js');
 
@@ -40,7 +40,6 @@ module.exports = {
 			await textChannel.send(createMatchMessage(match, teamOneVoice, teamTwoVoice, textId));
 			await textChannel.send(createInGameLobbyCreatorMessage(match.lobbyCreator));
 		}
-
 	},
 };
 
@@ -127,14 +126,14 @@ function createMatchMessage(match, teamOneVoice, teamTwoVoice, textId) {
 				.setStyle(ButtonStyle.Primary),
 		);
 
-	const [teamOneSide, teamTwoSide] = setSideSelection();
+	const [teamOneSide, teamTwoSide] = setSideSelection([TEAM_ATTACKERS_NAME, TEAM_DEFENDERS_NAME]);
 	const embed = new EmbedBuilder()
 		.setColor(0x0099FF)
 		.setTitle(`The game is ready. Chosen map is ${match.map.name}!`)
 		.setDescription('After the game please submit the winner')
 		.addFields(
-			{ name: `${teamOneSide}: ${teamOneVoice.name}`, value: teamOne, inline: true },
-			{ name: `${teamTwoSide}: ${teamTwoVoice.name}`, value: teamTwo, inline: true },
+			{ name: `${teamOneVoice.name}\n${teamOneSide}`, value: teamOne, inline: true },
+			{ name: `${teamTwoVoice.name}\n${teamTwoSide}`, value: teamTwo, inline: true },
 		)
 		.setTimestamp();
 

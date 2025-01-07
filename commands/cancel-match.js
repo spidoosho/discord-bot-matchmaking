@@ -1,6 +1,8 @@
 const { SlashCommandBuilder, ChannelType } = require('discord.js');
 const { getHighestPermissionName } = require('../src/utils.js');
 
+const db = require('../src/sqliteDatabase.js');
+
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('cancel-match')
@@ -14,8 +16,17 @@ module.exports = {
 			option.setName('reason')
 				.setDescription('reason of cancellation')
 				.setRequired(true)),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		const maxRole = await getHighestPermissionName(interaction, sqlClient);
+		const dbRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
+		const maxRole = getHighestPermissionName(interaction, dbRoles);
 
 		if (maxRole === undefined) {
 			interaction.reply({ content: 'Only admins can execute this command!', ephemeral: true });
@@ -35,9 +46,11 @@ module.exports = {
 		await channel.send(`Match cancelled by ${interaction.user}. Reason: ${reason}. No ratings have been updated. Match channels will be deleted after 1 minute.`);
 
 		setTimeout(async () => {
-			await interaction.guild.channels.delete(channel);
-			for (const voiceId of voiceIds) {
-				await interaction.guild.channels.delete(voiceId);
+			const currentChannels = await interaction.guild.channels.fetch();
+
+			for (const channelId of voiceIds.concat([channel.id])) {
+				if (!currentChannels.has(channelId)) continue;
+				await interaction.guild.channels.delete(channelId);
 			}
 		}, 60000);
 	},

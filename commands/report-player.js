@@ -15,10 +15,8 @@ module.exports = {
 				.setDescription('reason for report')
 				.setRequired(true)),
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		console.log('[DEBUG]: executing example');
-
 		const player = interaction.user;
-		const reportedPlayer = interaction.options.getUser('user');
+		const reportedPlayer = interaction.options.getMember('user');
 		const reportReason = interaction.options.getString('reason');
 
 		const reportChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'reports');

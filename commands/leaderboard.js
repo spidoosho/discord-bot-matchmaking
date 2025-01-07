@@ -4,10 +4,15 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('leaderboard')
 		.setDescription('Show current leaderboard'),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		console.log('[DEBUG]: Executing leaderboard');
-
-		// TODO: Limit to 10?
 		const playersData = await sqlDb.getPlayerData(sqlClient, interaction.guildId);
 
 		return interaction.reply(createLeaderboardMessage(playersData));
@@ -20,6 +25,10 @@ module.exports = {
  * @returns
  */
 function createLeaderboardMessage(playersData) {
+	if (playersData.length === 0) {
+		return { content: 'Leaderboard has no players yet.', ephemeral: true };
+	}
+
 	let text = `1. <@${playersData[0].id}> - ${playersData[0].rating} (${playersData[0].gamesWon}:${playersData[0].gamesLost})`;
 
 	for (let i = 1; i < playersData.length; i++) {

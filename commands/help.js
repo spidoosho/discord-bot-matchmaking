@@ -5,6 +5,14 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('help')
 		.setDescription('Lists all available commands'),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const embed = new EmbedBuilder()
 			.setColor(0x0099FF)

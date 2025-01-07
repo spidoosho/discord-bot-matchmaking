@@ -10,6 +10,7 @@ module.exports = {
 			return interaction.reply({ content: 'Only players from the game can set game result!', ephemeral: true });
 		}
 
+		await interaction.message.edit({ components: [] });
 		const [winnerTeamName, opponentTeam] = matchmakingManager.setGameResultSubmitter(interaction.guildId, gameId, interaction.member.id, winnerTeamId);
 
 		return interaction.reply({ content: `Player ${interaction.user} selected team ${winnerTeamName} as a winner. Please second team confirm: ${getPlayersMentionString(opponentTeam)}`,

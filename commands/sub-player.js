@@ -20,25 +20,47 @@ module.exports = {
 			option.setName('substitute')
 				.setDescription('player that substitutes')
 				.setRequired(true)),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const channel = interaction.options.getChannel('channel');
 		const player = interaction.options.getUser('player');
 		const substitute = interaction.options.getUser('substitute');
 
 		const [substitutePlayerData] = await getPlayerData(sqlClient, interaction.guildId, substitute.id, substitute.username);
-		const isChannelLobby = matchmakingManager.lobbySubstitute(interaction.guildId, channel.id, player.id, substitutePlayerData);
 
-		if (!isChannelLobby) {
+		if (matchmakingManager.isPlayerInMatchmaking(interaction.guildId, player.id)) {
+			return interaction.reply({ content: `Substitute player ${substitute} is already in matchmaking`, ephemeral: true });
+		}
+
+		const lobby = matchmakingManager.getLobby(interaction.guildId, channel.id);
+
+		if (lobby === undefined) {
 			return interaction.reply({ content: `Channel ${channel} is not a lobby`, ephemeral: true });
 		}
 
-		await channel.send(`Player ${player} has been substituted by player ${substitute}.`);
+		if (lobby.players.find(p => p.id === player.id) === undefined) {
+			return interaction.reply({ content: `Player ${player} is not in the lobby`, ephemeral: true });
+		}
 
-		return interaction.reply({ content: 'Substitute done', ephemeral: true });
+		const result = matchmakingManager.substitutePlayerInLobby(interaction.guildId, channel.id, player.id, substitutePlayerData);
+
+		if (result) {
+			await channel.send(`Player ${player} has been substituted by player ${substitute}.`);
+
+			return interaction.reply({ content: 'Substitute done', ephemeral: true });
+		}
+
+		return interaction.reply({ content: 'Substitute failed', ephemeral: true });
 	},
 };
 
-// TODO move to src (queue.js vyuziva)
 async function getPlayerData(dbClient, guildId, userId, username) {
 	let playerData = await sqlDb.getPlayerData(
 		dbClient,

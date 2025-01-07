@@ -1,22 +1,18 @@
 const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME } = require('./constants.js');
-const sqlDb = require('../src/sqliteDatabase.js');
-
-const { ChannelType, PermissionsBitField, Guild } = require('discord.js');
+const { ChannelType, PermissionsBitField } = require('discord.js');
 
 /**
  * Gets highest permission role name based on database and discord roles
  * @param {*} interaction interaction
- * @param {Database} sqlClient Sqlitecloud client
+ * @param {*} roles roles from database
  * @returns {Promise<string|undefined>} highest role name or undefined if not found any
  */
-async function getHighestPermissionName(interaction, sqlClient) {
-	const roles = await sqlDb.getDatabaseRoles(sqlClient, interaction.guildId);
-
+function getHighestPermissionName(interaction, roles) {
 	let dbAdminId;
-	if (ADMIN_ROLE_NAME in roles) {dbAdminId = roles[ADMIN_ROLE_NAME];}
+	if ('adminRoleId' in roles) {dbAdminId = roles.adminRoleId;}
 
 	let dbSuperAdminId;
-	if (SUPER_ADMIN_ROLE_NAME in roles) {dbSuperAdminId = roles[SUPER_ADMIN_ROLE_NAME];}
+	if ('superAdminRoleId' in roles) {dbSuperAdminId = roles.superAdminRoleId;}
 
 	if (dbSuperAdminId !== undefined && interaction.member.roles.cache.has(dbSuperAdminId)) {
 		return SUPER_ADMIN_ROLE_NAME;
@@ -89,7 +85,15 @@ function getAverageTeamRating(playerDataArr) {
 	return sum;
 }
 
-async function getGamesCategoryChannel(guild) {
+function factorial(num) {
+	let result = 1;
+	for (let i = 2; i <= num; i++) {
+		result *= i;
+	}
+	return result;
+}
+
+async function getGamesCategoryChannel(guild, botId) {
 	const channels = Array.from(guild.channels.cache.values());
 	channels.sort((a, b) => a.name.localeCompare(b.name));
 
@@ -97,14 +101,18 @@ async function getGamesCategoryChannel(guild) {
 	for (const channel of channels) {
 		if (channel.type !== ChannelType.GuildCategory) continue;
 
-		if (channel.name.includes(VALOJS_GAME_CATEGORY_NAME)) {
-			if (channel.children.cache.size < CATEGORY_MAX_CHANNEL_SIZE - 4) {
-				return channel;
-			}
+		if (!channel.name.includes(VALOJS_GAME_CATEGORY_NAME)) continue;
 
-			const nameSplit = channel.name.split(' ');
-			maxCounter = nameSplit[nameSplit.length - 1];
+		if (channel.children.cache.size < CATEGORY_MAX_CHANNEL_SIZE - 4 &&
+			channel.permissionsFor(botId).has(PermissionsBitField.Flags.ManageChannels) &&
+			channel.permissionsFor(botId).has(PermissionsBitField.Flags.SendMessages)) {
+			return channel;
 		}
+
+		const nameSplit = channel.name.split(' ');
+		if (isNaN(nameSplit[nameSplit.length - 1])) continue;
+
+		maxCounter = nameSplit[nameSplit.length - 1];
 	}
 
 	if (maxCounter === undefined) {
@@ -120,7 +128,7 @@ async function getGamesCategoryChannel(guild) {
 				deny: [PermissionsBitField.Flags.ManageChannels],
 			},
 			{
-				id: '1322612015474147429',
+				id: botId,
 				allow: [PermissionsBitField.Flags.ManageChannels],
 			},
 		],
@@ -205,4 +213,4 @@ function getClientMaxRolePosition(client, guild) {
 	return clientMember.roles.botRole.position;
 }
 
-module.exports = { createReadOnlyChannel, getClientMaxRolePosition, getAdminRoles, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };
+module.exports = { factorial, createReadOnlyChannel, getClientMaxRolePosition, getAdminRoles, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };

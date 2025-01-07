@@ -2,7 +2,7 @@ const { PlayersInQueue, LobbyVoiceChannels, OngoingMatches, VoiceLobby, GuildIds
 const { updatePlayerRating } = require('../src/playerRating.js');
 const { getSuitableMaps, selectMap } = require('../src/mapSelection.js');
 const { splitPlayers, selectLobbyCreator } = require('../src/playerSelection.js');
-const { COUNT_PLAYERS_GAME } = require('../src/constants.js');
+const { COUNT_PLAYERS_GAME, RANDOM_MAP_SHARE } = require('../src/constants.js');
 
 const db = require('../src/sqliteDatabase.js');
 
@@ -47,6 +47,10 @@ class MatchmakingManager {
 		return this.guildManagers[id].guildIds;
 	}
 
+	getMaps(guildId) {
+		return this.guildManagers[guildId].getMaps();
+	}
+
 	/**
 	 * Checks if a player is in guild's queue.
 	 * @param {string} guildId guild ID
@@ -81,8 +85,8 @@ class MatchmakingManager {
 	 * @param guildId guild ID
 	 * @return {number}
 	 */
-	getUniqueLobbyId(guildId) {
-		return this.guildManagers[guildId].getUniqueLobbyId();
+	getUniqueLobbyId(guildId, currentIds) {
+		return this.guildManagers[guildId].getUniqueLobbyId(currentIds);
 	}
 
 	/**
@@ -125,8 +129,8 @@ class MatchmakingManager {
 	 * @param {PlayerData} substitutePlayerData substitute's player data
 	 * @return {boolean} true if player was replaced; false if player ID not found
 	 */
-	lobbySubstitute(guildId, lobbyId, playerId, substitutePlayerData) {
-		return this.guildManagers[guildId].lobbySubstitute(lobbyId, playerId, substitutePlayerData);
+	substitutePlayerInLobby(guildId, lobbyId, playerId, substitutePlayerData) {
+		return this.guildManagers[guildId].substitutePlayerInLobby(lobbyId, playerId, substitutePlayerData);
 	}
 
 	/**
@@ -179,6 +183,10 @@ class MatchmakingManager {
 	 */
 	getPlayers(guildId, voiceId) {
 		return this.guildManagers[guildId].getPlayers(voiceId);
+	}
+
+	getLobby(guildId, textId) {
+		return this.guildManagers[guildId].getLobby(textId);
 	}
 
 	/**
@@ -276,25 +284,59 @@ class GuildManager {
 		/**
 		 * @type {number}
 		 */
-		this.lobbyId = 0;
+		this.lobbyId = 1;
+		/**
+		 * @type {Set<string>}
+		 */
+		this.playersInMatchmaking = new Set();
+		/**
+		 * @type {Set<string>}
+		 */
+		this.maps = new Set();
 	}
 
-	getUniqueLobbyId() {
+	getUniqueLobbyId(currentIds) {
+		while (currentIds.has(this.lobbyId) && this.lobbyId < 1000) {
+			this.lobbyId++;
+		}
+
+		if (this.lobbyId > 999) {
+			this.lobbyId = 1;
+			while (currentIds.has(this.lobbyId)) {
+				this.lobbyId++;
+			}
+		}
+
+		const lobbyId = this.lobbyId;
 		this.lobbyId++;
-		return this.lobbyId;
+		return lobbyId;
+	}
+
+	getMaps() {
+		return this.maps;
+	}
+
+	getLobby(textId) {
+		return this.voiceChannelLobbies.getLobbyByTextId(textId);
 	}
 
 	isPlayerInQueue(playerId) {
 		return this.playersInQueue.isPlayerInQueue(playerId);
 	}
 
+	isPlayerInMatchmaking(playerId) {
+		return this.playersInMatchmaking.has(playerId);
+	}
+
 	enqueuePlayer(playerData) {
 		this.playersInQueue.addPlayer(playerData);
+		this.playersInMatchmaking.add(playerData.id);
 
 		return [this.playersInQueue.getPlayersCount(), this.isThereEnoughPlayersForMatch()];
 	}
 
 	dequeuePlayer(playerId) {
+		this.playersInMatchmaking.delete(playerId);
 		this.playersInQueue.removePlayer(playerId);
 	}
 
@@ -304,7 +346,7 @@ class GuildManager {
 
 	async createLobby(guildId, voiceId, textId, dbClient) {
 		const playersArr = this.playersInQueue.extractPlayers();
-		const mapsPreferences = db.getMapsPreferencesData(dbClient, guildId, playersArr);
+		const mapsPreferences = await db.getMapsPreferencesData(dbClient, guildId, playersArr);
 		const matchHistory = {};
 		const maps = await getSuitableMaps(mapsPreferences, matchHistory);
 
@@ -320,6 +362,10 @@ class GuildManager {
 	 * @return {string} voice channel ID of the lobby
 	 */
 	cancelLobby(textId) {
+		const lobby = this.voiceChannelLobbies.getLobbyByTextId(textId);
+		for (const player of lobby.players) {
+			this.playersInMatchmaking.delete(player.id);
+		}
 		return this.voiceChannelLobbies.cancelLobby(textId);
 	}
 
@@ -329,6 +375,11 @@ class GuildManager {
 	 * @return {string[]} array of channel IDs of the match
 	 */
 	cancelMatch(textId) {
+		const match = this.ongoingMatches.getMatch(textId);
+		for (const player of match.teamOne.concat(match.teamTwo)) {
+			this.playersInMatchmaking.delete(player.id);
+		}
+
 		return this.ongoingMatches.cancelMatch(textId);
 	}
 
@@ -339,8 +390,14 @@ class GuildManager {
 	 * @param substitutePlayerData
 	 * @return {boolean}
 	 */
-	lobbySubstitute(lobbyId, playerId, substitutePlayerData) {
-		return this.voiceChannelLobbies.lobbySubstitute(lobbyId, playerId, substitutePlayerData);
+	substitutePlayerInLobby(lobbyId, playerId, substitutePlayerData) {
+		const substituted = this.voiceChannelLobbies.substitutePlayer(lobbyId, playerId, substitutePlayerData);
+
+		if (!substituted) return substituted;
+
+		this.playersInMatchmaking.delete(playerId);
+		this.playersInMatchmaking.add(substitutePlayerData.id);
+		return substituted;
 	}
 
 	getLobbyAndMatchCount() {
@@ -348,20 +405,22 @@ class GuildManager {
 	}
 
 	addVote(lobbyId, playerId, mapId) {
-		this.voiceChannelLobbies.addVote(lobbyId, playerId, mapId);
+		return this.voiceChannelLobbies.addVote(lobbyId, playerId, mapId);
 	}
 
 	isPlayerInLobby(voiceId, playerId) {
 		return this.voiceChannelLobbies.isPlayerInLobby(voiceId, playerId);
 	}
 
-	startMatch(voiceId, playerMapsPreferences) {
+	startMatch(voiceId, playerMapPreferences) {
 		const [textId, voiceLobby] = this.voiceChannelLobbies.removeLobby(voiceId);
 
-		const teams = splitPlayers(voiceLobby.players, COUNT_PLAYERS_GAME);
 		const mapId = selectMap(voiceLobby.maps, Object.values(voiceLobby.mapVotes));
 		const lobbyCreator = selectLobbyCreator(voiceLobby.players);
-		const map = playerMapsPreferences.maps[mapId];
+		const map = playerMapPreferences.maps[mapId];
+
+		assignSelectedMapShareToPlayers(playerMapPreferences, map);
+		const teams = splitPlayers(Object.values(playerMapPreferences.players), COUNT_PLAYERS_GAME, map);
 
 		return [textId, this.ongoingMatches.addMatch(textId, voiceId, teams, map, lobbyCreator)];
 	}
@@ -384,10 +443,21 @@ class GuildManager {
 
 	setMatchWinner(gameId, winnerTeamId, submitId, playerConfirmed) {
 		const match = this.ongoingMatches.getMatch(gameId);
+		if (match === undefined ||
+			(match.submitId === undefined && playerConfirmed)) {
+			// already set
+			return [undefined];
+		}
 
+		const matchResult = this.ongoingMatches.setMatchWinner(gameId, winnerTeamId, submitId, playerConfirmed);
 		const outdatedPlayerData = { teamOne: match.teamOne, teamTwo: match.teamTwo };
 		const updatedPlayerData = updatePlayerData(match, winnerTeamId);
-		const matchResult = this.ongoingMatches.setMatchWinner(gameId, winnerTeamId, submitId, playerConfirmed);
+
+		for (const player of updatedPlayerData.teamOne.concat(updatedPlayerData.teamTwo)) {
+			this.playersInMatchmaking.delete(player.id);
+		}
+
+		this.ongoingMatches.removeMatch(gameId);
 
 		return [matchResult, outdatedPlayerData, updatedPlayerData];
 	}
@@ -397,7 +467,24 @@ class GuildManager {
 	}
 
 	rejectMatchResult(gameId, playerId) {
+		const match = this.ongoingMatches.getMatch(gameId);
+		if (match === undefined ||
+			(match.submitId === undefined)) {
+			// already set
+			return undefined;
+		}
+
 		return this.ongoingMatches.rejectMatchResult(gameId, playerId);
+	}
+}
+
+function assignSelectedMapShareToPlayers(playerMapPreferences, map) {
+	for (const player of Object.values(playerMapPreferences.players)) {
+		if (isNaN(playerMapPreferences.matrix[player.matrixIndex][map.index])) {
+			player.mapShare = RANDOM_MAP_SHARE;
+			continue;
+		}
+		player.mapShare = playerMapPreferences.matrix[player.matrixIndex][map.index];
 	}
 }
 
@@ -424,12 +511,12 @@ function updatePlayerData(match, winnerTeamId) {
 
 	for (const player of match.teamOne) {
 		const newRating = updatePlayerRating(player.rating, teamTwoRatingAvg, teamOneResult, player.gamesWon + player.gamesLost);
-		result.teamOne.push(new PlayerData(player.id, player.username, player.gamesWon + teamOneResult, player.gamesLost + teamTwoResult, newRating));
+		result.teamOne.push(new PlayerData(player.id, player.username, player.gamesWon + teamOneResult, player.gamesLost + teamTwoResult, newRating, player.accumulatedShare, player.mapShare));
 	}
 
 	for (const player of match.teamTwo) {
 		const newRating = updatePlayerRating(player.rating, teamOneRatingAvg, teamTwoResult, player.gamesWon + player.gamesLost);
-		result.teamTwo.push(new PlayerData(player.id, player.username, player.gamesWon + teamTwoResult, player.gamesLost + teamOneResult, newRating));
+		result.teamTwo.push(new PlayerData(player.id, player.username, player.gamesWon + teamTwoResult, player.gamesLost + teamOneResult, newRating, player.accumulatedShare, player.mapShare));
 	}
 
 	return result;

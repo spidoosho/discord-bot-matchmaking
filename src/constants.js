@@ -1,8 +1,12 @@
 const { PermissionsBitField } = require('discord.js');
 
 exports.COUNT_PLAYERS_GAME = 2;
+exports.RANDOM_MAP_SHARE = 0.5;
+exports.MAP_HISTORY_LENGTH = 5;
 exports.COMMAND = 'command';
 exports.OFFLINE_STATUS = 'offline';
+exports.TEAM_ATTACKERS_NAME = 'The Attackers';
+exports.TEAM_DEFENDERS_NAME = 'The Defenders';
 exports.START_ELO = 1300;
 exports.SUPER_ADMIN_ROLE_NAME = 'ValoJs SuperAdmin';
 exports.SUPER_ADMIN_ROLE_CREATE_REASON = 'ValoJs needs a role for super admin';

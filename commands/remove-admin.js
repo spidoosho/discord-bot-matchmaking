@@ -12,21 +12,20 @@ module.exports = {
 				.setDescription('admin user')
 				.setRequired(true)),
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		const maxRole = await getHighestPermissionName(interaction, sqlClient);
+		const dbRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
+		const maxRole = getHighestPermissionName(interaction, dbRoles);
 
 		if (maxRole !== SUPER_ADMIN_ROLE_NAME) {
 			interaction.reply({ content: 'Only Super Admins can execute this command!', ephemeral: true });
 			return;
 		}
 
-		const dbRoles = await db.getDatabaseRoles(sqlClient, interaction.guildId);
 		if (!(ADMIN_ROLE_NAME in dbRoles)) {
 			interaction.reply({ content: 'Cannot find Admin role to be assigned!', ephemeral: true });
 			return;
 		}
 
-		const user = interaction.options.getUser('user');
-		const member = interaction.guild.members.cache.find(target => target.id === user.id);
+		const member = interaction.options.getMember('user');
 
 		if (!member.roles.cache.has(dbRoles[ADMIN_ROLE_NAME])) {
 			return interaction.reply({ content: `Member <@${member.id}> does not have <@&${dbRoles[ADMIN_ROLE_NAME]}> role.`, ephemeral: true });

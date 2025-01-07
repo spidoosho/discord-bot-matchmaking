@@ -4,8 +4,13 @@ module.exports = {
 
 		const [channelId, mapId] = args;
 
-		matchmakingManager.addVote(stringSelectMenuInteraction.guildId, channelId, stringSelectMenuInteraction.user.id, mapId);
+		const result = matchmakingManager.addVote(stringSelectMenuInteraction.guildId, channelId, stringSelectMenuInteraction.user.id, mapId);
 
-		return stringSelectMenuInteraction.reply({ content: 'Vote added.', ephemeral: true });
+		let message = 'Vote added.';
+		if (!result) {
+			message = 'Vote could not be added.';
+		}
+
+		return stringSelectMenuInteraction.reply({ content: message, ephemeral: true });
 	},
 };

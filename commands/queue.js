@@ -5,25 +5,31 @@ const {
 } = require('../src/messageComponents.js');
 const { getGamesCategoryChannel, getMentionPlayerMessage } = require('../src/utils');
 const { PlayerData } = require('../src/gameControllers.js');
-const { START_ELO } = require('../src/constants.js');
+const { START_ELO, VALOJS_GAME_CATEGORY_NAME } = require('../src/constants.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('queue')
 		.setDescription('Join the queue.'),
 	/**
-	 *
-	 * @param interaction
-	 * @param sqlClient
-	 * @param {MatchmakingManager} matchmakingManager
-	 * @return {Promise<*>}
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
 	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
-		console.log('[DEBUG]: Executing queue');
-
 		let guildId = interaction.guildId;
 		if (guildId === null) {
+			// command was sent in direct messages
 			guildId = args[0];
+		}
+
+		const mapSet = matchmakingManager.getMaps(interaction.guildId);
+
+		if (mapSet.size === 0) {
+			return interaction.reply({ content: 'No maps have been set for this server.', ephemeral: true });
 		}
 
 		const isPlayerNotInQueue = !(matchmakingManager.isPlayerInQueue(guildId, interaction.user.id));
@@ -117,9 +123,22 @@ function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 }
 
 async function createLobby(interaction, sqlClient, matchmakingManager, botId) {
-	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild);
+	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild, interaction.applicationId);
 
-	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId)}`;
+	const channels = interaction.guild.channels.cache.filter((channel) => channel.parentId === gameCategoryChannel.id);
+	const lobbyNumbers = new Set();
+
+	for (const channel of channels.values()) {
+		const nameSplit = channel.name.split('-');
+		if (nameSplit.length !== 2) continue;
+
+		const lobbyNumber = parseInt(channel.name.split('-')[1]);
+		if (isNaN(lobbyNumber)) continue;
+
+		lobbyNumbers.add(lobbyNumber);
+	}
+
+	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId, lobbyNumbers)}`;
 
 	const voiceChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,

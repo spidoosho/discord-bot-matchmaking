@@ -1,6 +1,6 @@
 const fs = require('fs');
-const { PlayerData, GuildIds } = require('./gameControllers.js');
-const { START_ELO } = require('./constants.js');
+const { PlayerData } = require('./gameControllers.js');
+const { START_ELO, MAP_HISTORY_LENGTH } = require('./constants.js');
 const { convertSnakeCaseToCamelCase, convertCamelCaseToSnakeCase } = require('./utils.js');
 
 /**
@@ -26,7 +26,8 @@ async function getGuildDbIds(dbClient, serverId) {
 	const result = {};
 
 	for (const role of roles) {
-		result[convertSnakeCaseToCamelCase(role.name)] = role.id;
+		const key = convertSnakeCaseToCamelCase(role.name);
+		result[key] = role.id;
 	}
 
 	return result;
@@ -127,7 +128,7 @@ async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
 	const query = await dbClient.sql(sql);
 
 	for (const player of query) {
-		result.push(new PlayerData(player.id, player.username, player.games_lost, player.games_won, player.rating));
+		result.push(new PlayerData(player.id, player.username, player.games_lost, player.games_won, player.rating, player.accumulated_share));
 	}
 
 	return result;
@@ -148,20 +149,44 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 		let updates = '';
 
 		for (const key in player) {
-			if (player[key] === undefined || key === 'id') continue;
+			if (key === 'accumulatedShare' && player.mapShare !== undefined) {
+				if (player.accumulatedShare === undefined) {
+					player.accumulatedShare = 0;
+				}
 
-			updates += `${key}='${player[key]}',`;
+				player.accumulatedShare += player.mapShare;
+			}
+			else if (player[key] === undefined || ['id', 'mapShare'].includes(key)) {
+				continue;
+			}
+
+			const snakeCaseKey = convertCamelCaseToSnakeCase(key);
+
+			updates += `${snakeCaseKey}='${player[key]}',`;
 		}
 
 		if (updates.length === 0) return;
 
 		updates = updates.slice(0, updates.length - 1);
-		updates = updates.replace('gamesWon', 'games_won').replace('gamesLost', 'games_lost');
-
 		sql += `UPDATE Players SET ${updates} WHERE id = ${player.id};`;
 	}
 
 	await dbClient.sql(sql);
+}
+
+async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, mapId, mapHistoryLength) {
+	let sql = `USE DATABASE ${serverId};`;
+	for (const player of playerDataAfter) {
+		const matchCount = player.gamesWon + player.gamesLost;
+
+		if (matchCount <= mapHistoryLength) {
+			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES (${player.id}, ${mapId}, ${matchCount});`;
+		}
+		else {
+			sql += `UPDATE MapHistory SET map_id=${mapId} WHERE player_id=${player.id} AND map_count=${matchCount % MAP_HISTORY_LENGTH};`;
+		}
+	}
+	await sqlClient.sql(sql);
 }
 
 /**
@@ -194,7 +219,7 @@ async function addMap(dbClient, serverId, newMapName) {
  * @param {string} mapId map ID
  */
 async function removeMap(dbClient, serverId, mapId) {
-	const query = `USE DATABASE ${serverId}; DELETE FROM MapsPreferences WHERE id_map = ${mapId}; DELETE FROM Maps WHERE id = ${mapId};`;
+	const query = `USE DATABASE ${serverId}; DELETE FROM MapPreferences WHERE map_id = ${mapId}; DELETE FROM Maps WHERE id = ${mapId};`;
 	await dbClient.sql(query);
 }
 
@@ -224,7 +249,7 @@ async function getMapsDictByIdWithIndices(dbClient, serverId) {
  * @param {number} value map preference value
  */
 async function updatePlayerMapPreference(dbClient, serverId, playerId, mapId, value) {
-	const query = `USE DATABASE ${serverId}; UPDATE MapsPreferences SET value = ${value} WHERE id_player='${playerId}' AND id_map=${mapId}`;
+	const query = `USE DATABASE ${serverId}; INSERT OR REPLACE INTO MapPreferences (player_id, map_id, value) VALUES ('${playerId}', '${mapId}', '${value}');`;
 	await dbClient.sql(query);
 }
 
@@ -237,7 +262,7 @@ async function updatePlayerMapPreference(dbClient, serverId, playerId, mapId, va
  * @param {number} value map preference value
  */
 async function addPlayerMapPreference(dbClient, serverId, playerId, mapId, value) {
-	const query = `USE DATABASE ${serverId}; INSERT INTO MapsPreferences (id_player, id_map, value) VALUES (${playerId}, ${mapId}, ${value});`;
+	const query = `USE DATABASE ${serverId}; INSERT INTO MapPreferences (player_id, map_id, value) VALUES (${playerId}, ${mapId}, ${value});`;
 	await dbClient.sql(query);
 }
 
@@ -263,18 +288,12 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
 	const playerSwitch = {};
 	for (let i = 0; i < playerDataArr.length; i++) {
 		// create new Dictionary instead of PlayerData to add index key
-		playerSwitch[playerDataArr[i].id] = {
-			index: i,
-			id: playerDataArr[i].id,
-			username: playerDataArr[i].username,
-			rating: playerDataArr[i].rating,
-			gamesWon: playerDataArr[i].gamesWon,
-			gamesLost: playerDataArr[i].gamesLost,
-		};
+		playerDataArr[i].matrixIndex = i;
+		playerSwitch[playerDataArr[i].id] = playerDataArr[i];
 		playerIdArr.push(playerDataArr[i].id);
 	}
 
-	const output = await dbClient.sql(`USE DATABASE ${serverId}; SELECT * FROM MapsPreferences WHERE id_player IN(${playerIdArr.join(',')}) ORDER BY id_player ASC;`);
+	const output = await dbClient.sql(`USE DATABASE ${serverId}; SELECT * FROM MapPreferences WHERE player_id IN(${playerIdArr.join(',')}) ORDER BY player_id ASC;`);
 
 	const mapSwitch = await getMapsDictByIdWithIndices(dbClient, serverId);
 
@@ -282,12 +301,12 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
 	const mapsPreferencesMatrix = [];
 	for (let i = 0; i < playerIdArr.length; i++) {
 		// unfilled map preference is set to 0
-		mapsPreferencesMatrix.push(getFilledArr(Object.keys(mapSwitch).length, 0));
+		mapsPreferencesMatrix.push(getFilledArr(Object.keys(mapSwitch).length, undefined));
 	}
 
 	for (const entry of output) {
-		const playerIndex = playerSwitch[entry.id_player].index;
-		const mapIndex = mapSwitch[entry.id_map].index;
+		const playerIndex = playerSwitch[entry.player_id].matrixIndex;
+		const mapIndex = mapSwitch[entry.map_id].index;
 		mapsPreferencesMatrix[playerIndex][mapIndex] = entry.value;
 	}
 
@@ -299,16 +318,49 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
  * @param {Database} dbClient Sqlitecloud client
  * @param {string} guildId guild ID
  */
-async function resetLeaderboard(dbClient, guildId) {
-	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating=${START_ELO}, games_won=0, games_lost=0;`;
+async function resetPlayerData(dbClient, guildId, initialRating) {
+	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating=${initialRating}, games_won=0, games_lost=0, accumulated_share=null;`;
+
+	await dbClient.sql(query);
+}
+
+/**
+ *
+ * @param {Database} dbClient
+ * @param {string} guildId
+ * @param {string[]} maps
+ */
+async function resetMapData(dbClient, guildId, maps) {
+	let query = `USE DATABASE ${guildId}; DELETE FROM MapHistory;`;
+	const currentMaps = await getMapsDictByIdWithIndices(dbClient, guildId);
+	const mapIdsToDelete = [];
+	const mapNamesToAdd = [];
+
+	for (const [mapId, map] of Object.entries(currentMaps)) {
+		if (!maps.includes(map.name)) {
+			// map is not in the list of maps to keep
+			mapIdsToDelete.push(mapId);
+		}
+	}
+
+	for (const map of maps) {
+		if (!Object.values(currentMaps).map(m => m.name).includes(map)) {
+			// map is not in the current maps
+			mapNamesToAdd.push(map);
+		}
+	}
+
+	query += `DELETE FROM MapPreferences WHERE map_id IN (${mapIdsToDelete.join(',')});`;
+	query += `DELETE FROM Maps WHERE id IN (${mapIdsToDelete.join(',')});`;
+	query += `INSERT INTO Maps (name) VALUES ${mapNamesToAdd.map(map => `('${map}')`).join(',')};`;
 
 	await dbClient.sql(query);
 }
 
 async function removePlayerFromDatabase(guildId, dbClient, memberId) {
-	const query = `USE DATABASE ${guildId}; DELETE FROM MapsPreferences WHERE id_player = ${memberId}; DELETE FROM Players WHERE id = ${memberId}`;
+	const query = `USE DATABASE ${guildId}; DELETE FROM MapPreferences WHERE player_id = ${memberId}; DELETE FROM Players WHERE id = ${memberId}`;
 
 	await dbClient.sql(query);
 }
 
-module.exports = { updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetLeaderboard, addMap, removeMap, addPlayerMapPreference, addOrUpdateRoles, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };
+module.exports = { resetMapData, updatePlayersMapHistory, updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetPlayerData, addMap, removeMap, addPlayerMapPreference, addOrUpdateRoles, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };

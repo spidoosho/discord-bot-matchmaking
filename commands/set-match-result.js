@@ -1,18 +1,17 @@
 const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder } = require('discord.js');
-const { getHighestPermissionName } = require('../src/utils.js');
-const { VALOJS_MAIN_CATEGORY_CHANNEL, ADMIN_ROLE_NAME } = require('../src/constants.js');
-const { getChannelByNameFromCategory, getMentionPlayerMessage } = require('../src/utils.js');
+const { VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { getChannelByNameFromCategory, getMentionPlayerMessage, getHighestPermissionName } = require('../src/utils.js');
 
 const db = require('../src/sqliteDatabase.js');
 const { PlayerData } = require('../src/gameControllers.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
-		.setName('set-game-result')
-		.setDescription('[Admins only]: Set lobby game result')
+		.setName('set-match-result')
+		.setDescription('[Admins only]: Set lobby match result')
 		.addChannelOption(option =>
 			option.setName('channel')
-				.setDescription('text channel of the game')
+				.setDescription('text channel of the match')
 				.addChannelTypes(ChannelType.GuildText)
 				.setRequired(true))
 		.addChannelOption(option =>
@@ -20,29 +19,48 @@ module.exports = {
 				.setDescription('voice channel of the winning team')
 				.addChannelTypes(ChannelType.GuildVoice)
 				.setRequired(true)),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const result = await checkIfCanSetResult(interaction, args, sqlClient, matchmakingManager);
 
+		if (result.removeButtons) {
+			// remove buttons because already submitted
+			await interaction.message.edit({ components: [] });
+		}
+
 		if (!result.canSet) {
+			// player cannot set game result
 			return interaction.reply(result.rejectMessage);
 		}
 
+		await interaction.message.edit({ components: [] });
+
 		const [matchResult, playerDataBefore, playerDataAfter] = matchmakingManager.setMatchWinner(...result.data, interaction.options === undefined);
+
+		if (matchResult === undefined) {
+			return interaction.reply({ content: 'Cannot verify game result.', ephemeral: true });
+		}
 
 		// convert players in team in dict into one array of players
 		await db.updatePlayersData(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(playerDataAfter.teamTwo));
-
 		await interaction.reply(createResultMessage(matchResult, playerDataBefore, playerDataAfter));
-		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'match-history');
 
+		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'match-history');
 		await matchHistoryChannel.send(createMatchHistoryMessage(matchResult));
 
 		setTimeout(async () => {
-			// todo add check if channels exist
-			await interaction.guild.channels.delete(matchResult.textId);
-			await interaction.guild.channels.delete(matchResult.voiceId);
-			for (const voiceChannel of matchResult.teamVoiceChannels) {
-				await interaction.guild.channels.delete(voiceChannel.id);
+			const currentChannels = await interaction.guild.channels.fetch();
+
+			for (const channel of matchResult.teamVoiceChannels.concat([matchResult.textId, matchResult.voiceId])) {
+				if (!currentChannels.has(channel)) continue;
+				await interaction.guild.channels.delete(channel);
 			}
 		}, 60000);
 	},
@@ -61,6 +79,7 @@ async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmaki
 	const result = {
 		canSet: undefined,
 		data: undefined,
+		removeButtons: undefined,
 		rejectMessage: undefined,
 	};
 
@@ -68,6 +87,7 @@ async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmaki
 
 	if (!matchmakingManager.canPlayerSetGameResult(interaction.guildId, gameId, interaction.member.id)) {
 		result.canSet = false;
+		result.removeButtons = false;
 		result.rejectMessage = { content: 'You cannot vote about game result!', ephemeral: true };
 		return result;
 	}
@@ -75,20 +95,30 @@ async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmaki
 	if (confirmed === '0') {
 		const isFirstReject = matchmakingManager.rejectMatchResult(interaction.guildId, gameId, interaction.user.id, winnerTeamId);
 
+		if (isFirstReject === undefined) {
+			result.canSet = false;
+			result.removeButtons = false;
+			result.rejectMessage = { content: 'Cannot verify game result.', ephemeral: true };
+			return result;
+		}
+
 		if (isFirstReject) {
 			const [teamOneName, teamTwoName] = getTeamVoiceNames(matchmakingManager, interaction.guildId, gameId);
+			result.removeButtons = true;
 			result.rejectMessage = { content: 'Reset game result. First time did not work', components: [createSetGameResultRow(gameId, teamOneName, teamTwoName)] };
 			return result;
 		}
 
-		const adminRoles = await db.getDatabaseRoles(sqlClient, interaction.guildId);
+		const adminRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
 
 		result.canSet = false;
-		result.rejectMessage = { content: `Game result cannot be confirmed by players. Please admins <@&${adminRoles[ADMIN_ROLE_NAME]}>` };
+		result.removeButtons = true;
+		result.rejectMessage = { content: `Game result cannot be confirmed by players. Please admins <@&${adminRoles.adminRoleId}>` };
 		return result;
 	}
 
 	result.canSet = true;
+	result.removeButtons = true;
 	result.data = [interaction.guildId, gameId, winnerTeamId, interaction.user.id];
 	return result;
 }
@@ -101,7 +131,8 @@ async function checkIfAdminCanSetResult(interaction, sqlClient) {
 	};
 
 	// sent from admin command
-	const maxRole = getHighestPermissionName(interaction, sqlClient);
+	const dbRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
+	const maxRole = getHighestPermissionName(interaction, dbRoles);
 
 	if (maxRole === undefined) {
 		result.canSet = false;
