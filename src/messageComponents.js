@@ -1,4 +1,4 @@
-const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
+const { ActionRowBuilder } = require('discord.js');
 const { StringSelectMenuBuilder, StringSelectMenuOptionBuilder } = require('discord.js');
 
 function createMenuSelectRow(map, customId) {
@@ -48,8 +48,7 @@ function createSelectMenuMapPreferences(mapsPreferences, onlyAdd) {
 	const maps = [];
 
 	for (const [key, value] of Object.entries(mapsPreferences.maps)) {
-		// index 0 because there is only one player in the matrix
-		if (!onlyAdd || mapsPreferences.matrix[0][value.index] === 0) {
+		if (!onlyAdd || mapsPreferences.matrix[0][value.index] === undefined) {
 			value.id = key;
 			value.value = mapsPreferences.matrix[0][value.index];
 			maps.push(value);

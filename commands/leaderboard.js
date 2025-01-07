@@ -20,9 +20,9 @@ module.exports = {
 };
 
 /**
- *
+ * Creates leaderboard message with player ratings and match records.
  * @param {PlayerData[]} playersData
- * @returns
+ * @returns {Message}
  */
 function createLeaderboardMessage(playersData) {
 	if (playersData.length === 0) {

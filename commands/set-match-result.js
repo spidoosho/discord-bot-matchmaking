@@ -1,9 +1,10 @@
-const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder } = require('discord.js');
-const { VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
+const { VALOJS_MAIN_CATEGORY_CHANNEL, MAP_HISTORY_LENGTH } = require('../src/constants.js');
 const { getChannelByNameFromCategory, getMentionPlayerMessage, getHighestPermissionName } = require('../src/utils.js');
 
 const db = require('../src/sqliteDatabase.js');
 const { PlayerData } = require('../src/gameControllers.js');
+const { MatchmakingManager } = require('../src/gameManagers.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -40,7 +41,9 @@ module.exports = {
 			return interaction.reply(result.rejectMessage);
 		}
 
-		await interaction.message.edit({ components: [] });
+		if (interaction.message) {
+			await interaction.message.edit({ components: [] });
+		}
 
 		const [matchResult, playerDataBefore, playerDataAfter] = matchmakingManager.setMatchWinner(...result.data, interaction.options === undefined);
 
@@ -50,6 +53,8 @@ module.exports = {
 
 		// convert players in team in dict into one array of players
 		await db.updatePlayersData(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(playerDataAfter.teamTwo));
+		await db.updatePlayersMapHistory(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(matchResult.teamTwo), matchResult.map.id, MAP_HISTORY_LENGTH);
+
 		await interaction.reply(createResultMessage(matchResult, playerDataBefore, playerDataAfter));
 
 		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'match-history');
@@ -58,7 +63,7 @@ module.exports = {
 		setTimeout(async () => {
 			const currentChannels = await interaction.guild.channels.fetch();
 
-			for (const channel of matchResult.teamVoiceChannels.concat([matchResult.textId, matchResult.voiceId])) {
+			for (const channel of matchResult.teamVoiceChannels.map(ch => ch.id).concat([matchResult.textId, matchResult.voiceId])) {
 				if (!currentChannels.has(channel)) continue;
 				await interaction.guild.channels.delete(channel);
 			}
@@ -66,6 +71,14 @@ module.exports = {
 	},
 };
 
+/**
+ * Checks if the result can be set based on the interaction.
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {string[]} args additional arguments
+ * @param {Database} sqlClient SQLiteCloud client
+ * @param {MatchmakingManager} matchmakingManager matchmaking manager
+ * @returns {boolean}
+ */
 async function checkIfCanSetResult(interaction, args, sqlClient, matchmakingManager) {
 	if (interaction.options === undefined) {
 		// sent from button click from a player
@@ -75,6 +88,14 @@ async function checkIfCanSetResult(interaction, args, sqlClient, matchmakingMana
 	return checkIfAdminCanSetResult(interaction, sqlClient);
 }
 
+/**
+ * If player interaction can set the match result.
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {string[]} args additional arguments
+ * @param {Database} sqlClient SQLiteCloud client
+ * @param {MatchmakingManager} matchmakingManager matchmaking manager
+ * @returns {{canSet: boolean, data: string[], removeButtons: boolean, rejectMessage: Message}}
+ */
 async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmakingManager) {
 	const result = {
 		canSet: undefined,
@@ -93,6 +114,7 @@ async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmaki
 	}
 
 	if (confirmed === '0') {
+		// rejected match result
 		const isFirstReject = matchmakingManager.rejectMatchResult(interaction.guildId, gameId, interaction.user.id, winnerTeamId);
 
 		if (isFirstReject === undefined) {
@@ -123,6 +145,12 @@ async function checkIfPlayerCanSetResult(interaction, args, sqlClient, matchmaki
 	return result;
 }
 
+/**
+ * Check if admin can set the match result.
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {Database} sqlClient SQLiteCloud client
+ * @returns {{canSet: boolean, data: string[], rejectMessage: Message}}
+ */
 async function checkIfAdminCanSetResult(interaction, sqlClient) {
 	const result = {
 		canSet: undefined,
@@ -151,8 +179,15 @@ async function checkIfAdminCanSetResult(interaction, sqlClient) {
 	return result;
 }
 
-function getTeamVoiceNames(matchmakingManager, guildId, gameId) {
-	const match = matchmakingManager.getMatch(guildId, gameId);
+/**
+ * Retrieves team voice channel names from the match.
+ * @param {MatchmakingManager} matchmakingManager matchmaking manager
+ * @param {string} guildId guild ID
+ * @param {string} matchID match ID
+ * @returns {string[]}
+ */
+function getTeamVoiceNames(matchmakingManager, guildId, matchID) {
+	const match = matchmakingManager.getMatch(guildId, matchID);
 
 	const result = [];
 
@@ -163,17 +198,24 @@ function getTeamVoiceNames(matchmakingManager, guildId, gameId) {
 	return result;
 }
 
-function createSetGameResultRow(gameId, teamOneName, teamTwoName) {
+/**
+ * Creates a row with buttons to set the game result.
+ * @param {string} matchID match ID
+ * @param {string} teamOneName name of the first team
+ * @param {string} teamTwoName name of the second team
+ * @returns {Message}
+ */
+function createSetGameResultRow(matchID, teamOneName, teamTwoName) {
 	const row = new ActionRowBuilder()
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`select-game-result_${gameId}_1`)
+				.setCustomId(`select-match-result_${matchID}_1`)
 				.setLabel(`${teamOneName} won`)
 				.setStyle(ButtonStyle.Primary),
 		)
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`select-game-result_${gameId}_2`)
+				.setCustomId(`select-match-result_${matchID}_2`)
 				.setLabel(`${teamTwoName} won`)
 				.setStyle(ButtonStyle.Primary),
 		);
@@ -181,22 +223,29 @@ function createSetGameResultRow(gameId, teamOneName, teamTwoName) {
 	return row;
 }
 
-function createResultMessage(matchResult, playerDataArrBefore, playerDataArrAfter) {
+/**
+ * Creates summary message of the match result.
+ * @param {Match} matchResult match data
+ * @param {{teamOne: PlayerData[], teamTwo:PlayerData[]}} playerDataBefore player data before the match
+ * @param {{teamOne: PlayerData[], teamTwo:PlayerData[]}} playerDataAfter player data after the match
+ * @returns {Message}
+ */
+function createResultMessage(matchResult, playerDataBefore, playerDataAfter) {
 	function getRatingUpdateStr(rating) {
 		if (rating <= 0) return rating;
 		return `+${rating}`;
 	}
 
-	function getPlayerText(playerDataBefore, playerDataAfter) {
-		return `<@${playerDataBefore.id}>: ${playerDataAfter.rating} (${getRatingUpdateStr(playerDataAfter.rating - playerDataBefore.rating)})`;
+	function getPlayerText(playerBefore, playerAfter) {
+		return `<@${playerBefore.id}>: ${playerAfter.rating} (${getRatingUpdateStr(playerAfter.rating - playerBefore.rating)})`;
 	}
 
-	let teamOne = getPlayerText(playerDataArrBefore.teamOne[0], playerDataArrAfter.teamOne[0]);
-	let teamTwo = getPlayerText(playerDataArrBefore.teamTwo[0], playerDataArrAfter.teamTwo[0]);
+	let teamOne = getPlayerText(playerDataBefore.teamOne[0], playerDataAfter.teamOne[0]);
+	let teamTwo = getPlayerText(playerDataBefore.teamTwo[0], playerDataAfter.teamTwo[0]);
 
-	for (let i = 1; i < playerDataArrBefore.teamOne.length; i++) {
-		teamOne += `\n${getPlayerText(playerDataArrBefore.teamOne[i], playerDataArrAfter.teamOne[i])}`;
-		teamTwo += `\n${getPlayerText(playerDataArrBefore.teamTwo[i], playerDataArrAfter.teamTwo[i])}`;
+	for (let i = 1; i < playerDataBefore.teamOne.length; i++) {
+		teamOne += `\n${getPlayerText(playerDataBefore.teamOne[i], playerDataAfter.teamOne[i])}`;
+		teamTwo += `\n${getPlayerText(playerDataBefore.teamTwo[i], playerDataAfter.teamTwo[i])}`;
 	}
 
 	const row = new ActionRowBuilder()
@@ -229,6 +278,12 @@ function createResultMessage(matchResult, playerDataArrBefore, playerDataArrAfte
 	return { content: 'Game channels will be deleted in 1 minute.', embeds: [embed], components: [row, updatePreferenceComponent] };
 }
 
+/**
+ * Creates select menu row for map preference.
+ * @param {{map:string, id:string}} map selected map
+ * @param {string} customId custom ID for the select menu
+ * @returns {Message}
+ */
 function createMenuSelectRow(map, customId) {
 	const select = new StringSelectMenuBuilder()
 		.setCustomId(`${customId}_${map.id}`)
@@ -243,6 +298,11 @@ function createMenuSelectRow(map, customId) {
 	return new ActionRowBuilder().addComponents(select);
 }
 
+/**
+ * Creates message for the match history.
+ * @param {Match} matchResult match data
+ * @returns {Message}
+ */
 function createMatchHistoryMessage(matchResult) {
 	function getScore(winnerId) {
 		if (winnerId == 2) return '0:1';

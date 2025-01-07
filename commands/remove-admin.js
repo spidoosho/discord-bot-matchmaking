@@ -11,6 +11,14 @@ module.exports = {
 			option.setName('user')
 				.setDescription('admin user')
 				.setRequired(true)),
+	/**
+	 * Executes slash command.
+	 * @param {ChatInputCommandInteraction} interaction slash command interaction
+	 * @param {string[]} args additional arguments
+	 * @param {Database} sqlClient SQLiteCloud client
+	 * @param {MatchmakingManager} matchmakingManager matchmaking manager
+	 * @returns {Promise<Message>} reply message to the command sender
+	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const dbRoles = await db.getGuildDbIds(sqlClient, interaction.guildId);
 		const maxRole = getHighestPermissionName(interaction, dbRoles);
@@ -20,18 +28,18 @@ module.exports = {
 			return;
 		}
 
-		if (!(ADMIN_ROLE_NAME in dbRoles)) {
+		if (!('adminRoleId' in dbRoles)) {
 			interaction.reply({ content: 'Cannot find Admin role to be assigned!', ephemeral: true });
 			return;
 		}
 
 		const member = interaction.options.getMember('user');
 
-		if (!member.roles.cache.has(dbRoles[ADMIN_ROLE_NAME])) {
-			return interaction.reply({ content: `Member <@${member.id}> does not have <@&${dbRoles[ADMIN_ROLE_NAME]}> role.`, ephemeral: true });
+		if (!member.roles.cache.has(dbRoles.adminRoleId)) {
+			return interaction.reply({ content: `Member <@${member.id}> does not have <@&${dbRoles.adminRoleId}> role.`, ephemeral: true });
 		}
 
-		member.roles.remove(dbRoles[ADMIN_ROLE_NAME]);
-		return interaction.reply({ content: `Role <@&${dbRoles[ADMIN_ROLE_NAME]}> has been removed from user <@${member.id}>.`, ephemeral: true });
+		member.roles.remove(dbRoles.adminRoleId);
+		return interaction.reply({ content: `Role <@&${dbRoles.adminRoleId}> has been removed from user <@${member.id}>.`, ephemeral: true });
 	},
 };

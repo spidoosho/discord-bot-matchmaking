@@ -48,12 +48,17 @@ function createMessageAboutPlayer(playerData, mapsPreferences) {
 	return { embeds: [embed], ephemeral: true };
 }
 
+/**
+ * Get string with maps and their values.
+ * @param {{matrix: number[][], maps: {name:string, index: number}}} mapsPreferences map preferences
+ * @returns {string}
+ */
 function getMapsString(mapsPreferences) {
 	let result = '';
 	for (const map of Object.values(mapsPreferences.maps)) {
 		let value = mapsPreferences.matrix[0][map.index];
 		if (value === 0) {value = 'not set';}
-		result += `${map.name}: ${value}, `;
+		result += `${map.name}: ${parseFloat(value) * 10}, `;
 	}
 
 	result = result.slice(0, -2);

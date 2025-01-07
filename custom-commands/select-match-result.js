@@ -2,7 +2,7 @@ const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getPlayersMentionString } = require('../src/utils.js');
 
 module.exports = {
-	data: { name: 'select-game-result' },
+	data: { name: 'select-match-result' },
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const [gameId, winnerTeamId] = args;
 
@@ -22,13 +22,13 @@ function createConfirmationButtonRow(gameId, winnerTeamId) {
 	const row = new ActionRowBuilder()
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`command_set-game-result_${gameId}_${winnerTeamId}_1`)
+				.setCustomId(`command_set-match-result_${gameId}_${winnerTeamId}_1`)
 				.setLabel('Confirm')
 				.setStyle(ButtonStyle.Primary),
 		)
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`command_set-game-result_${gameId}_${winnerTeamId}_0`)
+				.setCustomId(`command_set-match-result_${gameId}_${winnerTeamId}_0`)
 				.setLabel('Reject')
 				.setStyle(ButtonStyle.Primary),
 		);

@@ -29,6 +29,13 @@ module.exports = {
 	},
 };
 
+/**
+ * Creates a dequeue message with enqueue button
+ * @param {boolean} wasSuccessful was dequeueing successful
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {string} guildId guild ID
+ * @returns {Message}
+ */
 function createDequeueMessage(wasSuccessful, interaction, guildId) {
 	// add button to queue to the message
 	let message;

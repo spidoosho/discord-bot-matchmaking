@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const sqlDb = require('../src/sqliteDatabase.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()

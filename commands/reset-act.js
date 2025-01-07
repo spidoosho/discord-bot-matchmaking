@@ -45,8 +45,8 @@ module.exports = {
 		await db.resetPlayerData(sqlClient, interaction.guildId, START_ELO);
 
 		const generalChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'general');
-
 		await generalChannel.send({ content: `Act reset. New map rotation: ${maps.join(', ')}` });
+
 		return interaction.reply({ content: 'Act reset.', ephemeral: true });
 	},
 };

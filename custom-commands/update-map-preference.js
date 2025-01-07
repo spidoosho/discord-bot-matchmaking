@@ -6,7 +6,7 @@ module.exports = {
 	data: { name: 'update-map-preference' },
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const [mapId] = args;
-		const value = parseInt(interaction.values[0]);
+		const value = parseInt(interaction.values[0]) / 10;
 
 		const playerDataDummy = new PlayerData(interaction.user.id);
 		const playerMapsPreferences = await sqlDb.getMapsPreferencesData(sqlClient, interaction.guildId, [playerDataDummy]);

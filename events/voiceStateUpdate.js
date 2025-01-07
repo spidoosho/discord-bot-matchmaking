@@ -115,13 +115,13 @@ function createMatchMessage(match, teamOneVoice, teamTwoVoice, textId) {
 	const row = new ActionRowBuilder()
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`select-game-result_${textId}_1`)
+				.setCustomId(`select-match-result_${textId}_1`)
 				.setLabel(`${teamOneVoice.name} won`)
 				.setStyle(ButtonStyle.Primary),
 		)
 		.addComponents(
 			new ButtonBuilder()
-				.setCustomId(`select-game-result_${textId}_2`)
+				.setCustomId(`select-match-result_${textId}_2`)
 				.setLabel(`${teamTwoVoice.name} won`)
 				.setStyle(ButtonStyle.Primary),
 		);

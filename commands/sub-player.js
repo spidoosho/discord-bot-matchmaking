@@ -3,6 +3,7 @@ const sqlDb = require('../src/sqliteDatabase.js');
 
 const { START_ELO } = require('../src/constants.js');
 const { PlayerData } = require('../src/gameControllers.js');
+const { Database } = require('@sqlitecloud/drivers');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -33,9 +34,9 @@ module.exports = {
 		const player = interaction.options.getUser('player');
 		const substitute = interaction.options.getUser('substitute');
 
-		const [substitutePlayerData] = await getPlayerData(sqlClient, interaction.guildId, substitute.id, substitute.username);
+		const substitutePlayerData = await getPlayerData(sqlClient, interaction.guildId, substitute.id, substitute.username);
 
-		if (matchmakingManager.isPlayerInMatchmaking(interaction.guildId, player.id)) {
+		if (matchmakingManager.isPlayerInMatchmaking(interaction.guildId, substitute.id)) {
 			return interaction.reply({ content: `Substitute player ${substitute} is already in matchmaking`, ephemeral: true });
 		}
 
@@ -61,6 +62,14 @@ module.exports = {
 	},
 };
 
+/**
+ * Retrieves or create player data
+ * @param {Database} dbClient SQLiteCloud client
+ * @param {string} guildId guild ID
+ * @param {string} userId user ID
+ * @param {string} username user name
+ * @returns {Promise<PlayerData>}
+ */
 async function getPlayerData(dbClient, guildId, userId, username) {
 	let playerData = await sqlDb.getPlayerData(
 		dbClient,
@@ -73,5 +82,5 @@ async function getPlayerData(dbClient, guildId, userId, username) {
 		await sqlDb.addPlayer(dbClient, guildId, playerData);
 	}
 
-	return playerData;
+	return playerData[0];
 }

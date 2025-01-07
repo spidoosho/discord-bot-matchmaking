@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ChatInputCommandInteraction } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { getHighestPermissionName } = require('../src/utils.js');
 const db = require('../src/sqliteDatabase.js');
 

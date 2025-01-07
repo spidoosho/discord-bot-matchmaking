@@ -51,6 +51,10 @@ class MatchmakingManager {
 		return this.guildManagers[guildId].getMaps();
 	}
 
+	setMaps(guildId, maps) {
+		return this.guildManagers[guildId].setMaps(maps);
+	}
+
 	/**
 	 * Checks if a player is in guild's queue.
 	 * @param {string} guildId guild ID
@@ -59,6 +63,10 @@ class MatchmakingManager {
 	 */
 	isPlayerInQueue(guildId, playerId) {
 		return this.guildManagers[guildId].isPlayerInQueue(playerId);
+	}
+
+	isPlayerInMatchmaking(guildId, playerId) {
+		return this.guildManagers[guildId].isPlayerInMatchmaking(playerId);
 	}
 
 	/**
@@ -316,6 +324,10 @@ class GuildManager {
 		return this.maps;
 	}
 
+	setMaps(maps) {
+		this.maps = new Set(maps);
+	}
+
 	getLobby(textId) {
 		return this.voiceChannelLobbies.getLobbyByTextId(textId);
 	}
@@ -363,6 +375,9 @@ class GuildManager {
 	 */
 	cancelLobby(textId) {
 		const lobby = this.voiceChannelLobbies.getLobbyByTextId(textId);
+
+		if (lobby === undefined) return undefined;
+
 		for (const player of lobby.players) {
 			this.playersInMatchmaking.delete(player.id);
 		}

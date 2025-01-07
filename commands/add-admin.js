@@ -28,18 +28,19 @@ module.exports = {
 			return;
 		}
 
-		if (!(ADMIN_ROLE_NAME in dbRoles)) {
+		if (!('adminRoleId' in dbRoles)) {
 			interaction.reply({ content: 'Cannot find Admin role to be assigned!', ephemeral: true });
 			return;
 		}
 
 		const member = interaction.options.getMember('user');
 
-		if (member.roles.cache.has(dbRoles[ADMIN_ROLE_NAME])) {
-			return interaction.reply({ content: `Member <@${member.id}> is already a <@&${dbRoles[ADMIN_ROLE_NAME]}>.`, ephemeral: true });
+		console.log(dbRoles.adminRoleId);
+		if (member.roles.cache.has(dbRoles.adminRoleId)) {
+			return interaction.reply({ content: `Member <@${member.id}> is already a <@&${dbRoles.adminRoleId}>.`, ephemeral: true });
 		}
 
-		member.roles.add(dbRoles[ADMIN_ROLE_NAME]);
-		return interaction.reply({ content: `Member <@${member.id}> is now a <@&${dbRoles[ADMIN_ROLE_NAME]}>.`, ephemeral: true });
+		member.roles.add(dbRoles.adminRoleId);
+		return interaction.reply({ content: `Member <@${member.id}> is now a <@&${dbRoles.adminRoleId}>.`, ephemeral: true });
 	},
 };

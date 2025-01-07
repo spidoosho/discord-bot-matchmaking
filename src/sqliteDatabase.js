@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { PlayerData } = require('./gameControllers.js');
-const { START_ELO, MAP_HISTORY_LENGTH } = require('./constants.js');
+const { MAP_HISTORY_LENGTH } = require('./constants.js');
 const { convertSnakeCaseToCamelCase, convertCamelCaseToSnakeCase } = require('./utils.js');
 
 /**
@@ -179,7 +179,7 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
 	for (const player of playerDataAfter) {
 		const matchCount = player.gamesWon + player.gamesLost;
 
-		if (matchCount <= mapHistoryLength) {
+		if (matchCount < mapHistoryLength) {
 			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES (${player.id}, ${mapId}, ${matchCount});`;
 		}
 		else {
@@ -197,7 +197,6 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
  */
 async function addPlayer(dbClient, serverId, playerData) {
 	const sql = `USE DATABASE ${serverId}; INSERT INTO Players (id, username, rating, games_won, games_lost) VALUES ('${playerData.id}', '${playerData.username}', ${playerData.rating}, ${playerData.gamesWon}, ${playerData.gamesLost});`;
-	console.log(sql);
 	await dbClient.sql(sql);
 }
 
@@ -287,7 +286,6 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
 	const playerIdArr = [];
 	const playerSwitch = {};
 	for (let i = 0; i < playerDataArr.length; i++) {
-		// create new Dictionary instead of PlayerData to add index key
 		playerDataArr[i].matrixIndex = i;
 		playerSwitch[playerDataArr[i].id] = playerDataArr[i];
 		playerIdArr.push(playerDataArr[i].id);
@@ -319,7 +317,7 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
  * @param {string} guildId guild ID
  */
 async function resetPlayerData(dbClient, guildId, initialRating) {
-	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating=${initialRating}, games_won=0, games_lost=0, accumulated_share=null;`;
+	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating='${initialRating}', games_won=0, games_lost=0, accumulated_share=NULL;`;
 
 	await dbClient.sql(query);
 }
@@ -350,9 +348,14 @@ async function resetMapData(dbClient, guildId, maps) {
 		}
 	}
 
-	query += `DELETE FROM MapPreferences WHERE map_id IN (${mapIdsToDelete.join(',')});`;
-	query += `DELETE FROM Maps WHERE id IN (${mapIdsToDelete.join(',')});`;
-	query += `INSERT INTO Maps (name) VALUES ${mapNamesToAdd.map(map => `('${map}')`).join(',')};`;
+	if (mapIdsToDelete.length !== 0) {
+		query += `DELETE FROM MapPreferences WHERE map_id IN (${mapIdsToDelete.join(',')});`;
+		query += `DELETE FROM Maps WHERE id IN (${mapIdsToDelete.join(',')});`;
+	}
+
+	if (mapNamesToAdd.length !== 0) {
+		query += `INSERT INTO Maps (name) VALUES ${mapNamesToAdd.map(map => `('${map}')`).join(',')};`;
+	}
 
 	await dbClient.sql(query);
 }

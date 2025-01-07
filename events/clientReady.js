@@ -28,6 +28,7 @@ module.exports = {
 				await db.createDatabaseForServer(sqlClient, guildId);
 			}
 
+			// TODO: check maps
 			// TODO: check permissions
 
 			const guildDbIds = await db.getGuildDbIds(sqlClient, guildId);
@@ -40,6 +41,11 @@ module.exports = {
 
 			guildIds = await checkValoJSCategories(guild, guildIds);
 			await db.updateGuildIds(sqlClient, guildId, guildIds);
+
+
+			const maps = await db.getMapsDictByIdWithIndices(sqlClient, guildId);
+			const mapNames = Object.values(maps).map(map => map.name);
+			matchmakingManager.setMaps(guildId, mapNames);
 		}
 
 		// start REST API

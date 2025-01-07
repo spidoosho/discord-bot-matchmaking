@@ -73,14 +73,7 @@ class PlayersInQueue {
 	}
 
 	isPlayerInQueue(id) {
-		let itemIndex = -1;
-		for (let i = 0; i < this.queue.length && itemIndex === -1; i++) {
-			if (this.queue[i].id === id) {
-				itemIndex = i;
-			}
-		}
-
-		return itemIndex !== -1;
+		return this.	queue.some(player => player.id === id);
 	}
 
 	isThereEnoughPlayersForGame() {
@@ -349,7 +342,7 @@ class OngoingMatches {
 
 		if (this.matches[gameId].submitId) return [undefined];
 
-		this.winnerId = winnerId;
+		this.matches[gameId].winnerId = winnerId;
 		this.matches[gameId].submitId = playerId;
 		this.matches[gameId].removedFromResult.add(playerId);
 

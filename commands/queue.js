@@ -1,11 +1,9 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitField, ButtonStyle, ChannelType, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, PermissionsBitField, ButtonStyle, ChannelType, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
 const sqlDb = require('../src/sqliteDatabase.js');
-const {
-	createSelectMenuMapPreferences,
-} = require('../src/messageComponents.js');
+const {	createSelectMenuMapPreferences } = require('../src/messageComponents.js');
 const { getGamesCategoryChannel, getMentionPlayerMessage } = require('../src/utils');
 const { PlayerData } = require('../src/gameControllers.js');
-const { START_ELO, VALOJS_GAME_CATEGORY_NAME } = require('../src/constants.js');
+const { START_ELO } = require('../src/constants.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -34,25 +32,22 @@ module.exports = {
 
 		const isPlayerNotInQueue = !(matchmakingManager.isPlayerInQueue(guildId, interaction.user.id));
 
-		// player is already in queue
 		if (!isPlayerNotInQueue) {
+			// player is already in queue
 			return interaction.reply(createQueueMessage(isPlayerNotInQueue));
 		}
 
-		// add player to queue
-		const [playerData] = await getPlayerData(sqlClient, interaction, guildId);
+		const playerData = await getPlayerData(sqlClient, interaction, guildId);
 
-		// add player to queue
+		// adds player to queue
 		const [queueCount, canStartLobby] = matchmakingManager.enqueuePlayer(guildId, playerData);
 
-		// if there is enough players, start a lobby
 		if (canStartLobby) {
 			await createLobby(interaction, sqlClient, matchmakingManager, interaction.applicationId);
 		}
 
-		// return message to print
-		// skip missing map preference messages if command sent in direct messages
 		if (interaction.guildId === null) {
+			// skips missing map preference messages if command sent in direct messages
 			return interaction.reply(createQueueMessage(isPlayerNotInQueue, queueCount, guildId));
 		}
 
@@ -61,6 +56,12 @@ module.exports = {
 	},
 };
 
+/**
+ * Sends map preferences messages to the player.
+ * @param {Database} sqlClient SQLiteCloud client
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {PlayerData} playerData player data
+ */
 async function getPlayerMapsPreferences(sqlClient, interaction, playerData) {
 	const mapsPreferences = await sqlDb.getMapsPreferencesData(sqlClient, interaction.guildId, [playerData]);
 
@@ -78,6 +79,13 @@ async function getPlayerMapsPreferences(sqlClient, interaction, playerData) {
 	}
 }
 
+/**
+ * Retrieves or creates player data from the database.
+ * @param {Database} dbClient SQLiteCloud client
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {string} guildId guild ID
+ * @returns {Promise<PlayerData>}
+ */
 async function getPlayerData(dbClient, interaction, guildId) {
 	let playerData = await sqlDb.getPlayerData(
 		dbClient,
@@ -86,15 +94,22 @@ async function getPlayerData(dbClient, interaction, guildId) {
 	);
 
 	if (playerData.length !== 0) {
-		return playerData;
+		return playerData[0];
 	}
 
 	playerData = new PlayerData(interaction.user.id, interaction.user.username, 0, 0, START_ELO);
 	await sqlDb.addPlayer(dbClient, guildId, playerData);
 
-	return [playerData];
+	return playerData;
 }
 
+/**
+ * Creates a queue message with dequeue button.
+ * @param {boolean} wasSuccessful if player was enqueued successfully
+ * @param {number} queueCount number of players in the queue
+ * @param {string} guildId guild ID
+ * @returns {Message}
+ */
 function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 	// add button to dequeue to the message
 	let id = '';
@@ -122,23 +137,16 @@ function createQueueMessage(wasSuccessful, queueCount, guildId = undefined) {
 	return { content: message, components: [row], ephemeral };
 }
 
+/**
+ * Creates a lobby for the players in the queue.
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {Database} sqlClient SQLiteCloud client
+ * @param {MatchmakingManager} matchmakingManager matchmaking manager
+ * @param {string} botId the Bot ID
+ */
 async function createLobby(interaction, sqlClient, matchmakingManager, botId) {
-	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild, interaction.applicationId);
-
-	const channels = interaction.guild.channels.cache.filter((channel) => channel.parentId === gameCategoryChannel.id);
-	const lobbyNumbers = new Set();
-
-	for (const channel of channels.values()) {
-		const nameSplit = channel.name.split('-');
-		if (nameSplit.length !== 2) continue;
-
-		const lobbyNumber = parseInt(channel.name.split('-')[1]);
-		if (isNaN(lobbyNumber)) continue;
-
-		lobbyNumbers.add(lobbyNumber);
-	}
-
-	const lobbyName = `Lobby-${matchmakingManager.getUniqueLobbyId(interaction.guildId, lobbyNumbers)}`;
+	const [gameCategoryChannel, lobbyId] = await getUniqueLobbyId(interaction, matchmakingManager);
+	const lobbyName = `Lobby-${lobbyId}`;
 
 	const voiceChannel = await interaction.member.guild.channels.create({
 		name: lobbyName,
@@ -181,6 +189,39 @@ async function createLobby(interaction, sqlClient, matchmakingManager, botId) {
 	await textChannel.send(`Please join ${voiceChannel} to start the game.`);
 }
 
+/**
+ * Retrieves a unique lobby ID for the new lobby.
+ * @param {ChatInputCommandInteraction} interaction command interaction
+ * @param {MatchmakingManager} matchmakingManager matchmaking manager
+ * @returns number
+ */
+async function getUniqueLobbyId(interaction, matchmakingManager) {
+	const gameCategoryChannel = await getGamesCategoryChannel(interaction.guild, interaction.applicationId);
+
+	// get all channels in the game category
+	const channels = interaction.guild.channels.cache.filter((channel) => channel.parentId === gameCategoryChannel.id);
+	const lobbyNumbers = new Set();
+
+	for (const channel of channels.values()) {
+		const nameSplit = channel.name.split('-');
+		if (nameSplit.length !== 2) continue;
+
+		const lobbyNumber = parseInt(channel.name.split('-')[1]);
+		if (isNaN(lobbyNumber)) continue;
+
+		lobbyNumbers.add(lobbyNumber);
+	}
+
+	const uniqueLobbyId = matchmakingManager.getUniqueLobbyId(interaction.guildId, lobbyNumbers);
+	return [gameCategoryChannel, uniqueLobbyId];
+}
+
+/**
+ * Creates map select message.
+ * @param {{name: string, id: string}} maps maps for buttons
+ * @param {string} channelId text channel ID
+ * @returns {Message}
+ */
 function createSelectMapMessage(maps, channelId) {
 	const embed = new EmbedBuilder()
 		.setColor(0x0099FF)
