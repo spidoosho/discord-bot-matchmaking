@@ -12,7 +12,7 @@ const dbclient = new Database(`${process.env.SQLITECLOUD_CONNECTION_STRING}?apik
  * Sends static website with usage.
  */
 router.get('/', async function(req, res) {
-	res.sendFile(path.join(__dirname, 'static', 'index.html'));
+	res.sendFile(path.join(__dirname, '../static', 'index.html'));
 });
 
 /**
@@ -53,9 +53,16 @@ router.get('/:serverId/text', async function(req, res) {
 });
 
 /**
+ * Sends static website with usage.
+ */
+router.get('/:serverId/player', async function(req, res) {
+	res.sendFile(path.join(__dirname, '../static', 'index.html'));
+});
+
+/**
  * Renders a player data.
  */
-router.get('/:serverId/:playerId', async function(req, res) {
+router.get('/:serverId/player/:playerId', async function(req, res) {
 	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
 	if (result.leaderboard === undefined || result.playerDataArr === undefined) {
@@ -71,7 +78,7 @@ router.get('/:serverId/:playerId', async function(req, res) {
 /**
  * Sends a JSON response with an player data and leadeboard ID.
  */
-router.get('/:serverId/:playerId/json', async function(req, res) {
+router.get('/:serverId/player/:playerId/json', async function(req, res) {
 	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
 	if (result.leaderboard === undefined || result.playerDataArr === undefined) {
@@ -87,7 +94,7 @@ router.get('/:serverId/:playerId/json', async function(req, res) {
 /**
  * Sends a text message with player data.
  */
-router.get('/:serverId/:playerId/text', async function(req, res) {
+router.get('/:serverId/player/:playerId/text', async function(req, res) {
 	const result = await getPlayerDataFromDatabase(dbclient, req.params.serverId, [req.params.playerId]);
 
 	if (result.leaderboard === undefined || result.playerDataArr === undefined) {

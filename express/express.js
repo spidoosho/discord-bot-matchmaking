@@ -20,7 +20,7 @@ function startExpress() {
 	app.use(bodyParser.json());
 
 	// Routes
-	app.use('/', leaderboard);
+	app.use('/server/', leaderboard);
 
 	// Connection
 	const port = process.env.PORT || 9001;

@@ -1,5 +1,6 @@
-const { Events } = require('discord.js');
+const { Events, PermissionsBitField } = require('discord.js');
 const { BOT_PERMISSIONS } = require('../src/constants.js');
+const { checkOrCreateAdminRoles, checkOrCreateValoJSCategories } = require('../src/utils.js');
 
 /**
  * Emitted whenever guild role is changed.
@@ -32,6 +33,16 @@ module.exports = {
 			return;
 		}
 
+		if (!oldRole.permissions.has(PermissionsBitField.Flags.ManageRoles) && newRole.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+			let guildIds = matchmakingManager.getGuildIds(newRole.guild.id);
+			guildIds = checkOrCreateAdminRoles(client, newRole.guild, guildIds);
+			if (!oldRole.permissions.has(PermissionsBitField.Flags.ManageChannels) && newRole.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+				guildIds = await checkOrCreateValoJSCategories(newRole.guild, guildIds);
+			}
+
+			matchmakingManager.setGuildIds(newRole.guild.id, guildIds);
+		}
+
 		// check if any needed permissions is missing
 		const flags = BOT_PERMISSIONS;
 		const missingRoles = [];
@@ -40,7 +51,10 @@ module.exports = {
 			missingRoles.push(flag);
 		}
 
-		if (missingRoles.length === 0) return;
+		if (missingRoles.length === 0) {
+			matchmakingManager.setGuildReady(newRole.guild.id, true);
+			return;
+		}
 
 		// notify owner via direct message
 		const owner = await newRole.guild.fetchOwner();

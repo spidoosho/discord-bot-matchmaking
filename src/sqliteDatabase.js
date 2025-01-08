@@ -9,7 +9,12 @@ const { convertSnakeCaseToCamelCase, convertCamelCaseToSnakeCase } = require('./
  * @param {string} serverId serverId
  */
 async function createDatabaseForServer(dbClient, serverId) {
-	const command = `CREATE DATABASE ${serverId}; USE DATABASE ${serverId}; ${fs.readFileSync('./sql/create-tables.sql', 'utf8')}`;
+	const command = `CREATE DATABASE '${serverId}';`;
+	await dbClient.sql(command);
+}
+
+async function createTablesForServer(dbClient, serverId) {
+	const command = `USE DATABASE '${serverId}'; ${fs.readFileSync('./sql/create-tables.sql', 'utf8')};`;
 	await dbClient.sql(command);
 }
 
@@ -20,7 +25,7 @@ async function createDatabaseForServer(dbClient, serverId) {
  * @returns {Promise<Object<string, string>>} roles in database. key:roleName, value:roleId
  */
 async function getGuildDbIds(dbClient, serverId) {
-	const command = `USE DATABASE ${serverId}; SELECT * FROM GuildIds;`;
+	const command = `USE DATABASE '${serverId}'; SELECT * FROM GuildIds;`;
 
 	const roles = await dbClient.sql(command);
 	const result = {};
@@ -40,7 +45,7 @@ async function getGuildDbIds(dbClient, serverId) {
  * @param {GuildIds} guildIds
  */
 async function updateGuildIds(dbClient, serverId, guildIds) {
-	let command = `USE DATABASE ${serverId}; DELETE FROM GuildIds; INSERT INTO GuildIds (name, id) VALUES `;
+	let command = `USE DATABASE '${serverId}'; DELETE FROM GuildIds; INSERT INTO GuildIds (name, id) VALUES `;
 
 	for (const [key, value] of Object.entries(guildIds)) {
 		if (value === undefined) continue;
@@ -68,16 +73,23 @@ async function getDatabases(dbClient) {
 }
 
 /**
- * Drop database and tables of the server
+ * Drop tables in database
  * @param {Database} dbClient SQLiteCloud client
  * @param {string} serverId serverId
  */
-async function dropDatabaseByName(dbClient, serverId) {
+async function dropDatabaseTables(dbClient, serverId) {
 	const databases = await getDatabases(dbClient);
 	if (!databases.has(serverId)) return;
 
-	const removeSql = `REMOVE DATABASE ${serverId}`;
-	return dbClient.sql(removeSql);
+	const listSql = `USE DATABASE '${serverId}'; LIST TABLES;`;
+	const sqlTables = await dbClient.sql(listSql);
+
+	let sql = '';
+	for (const table of sqlTables) {
+		sql += `DROP TABLE '${table.name}';`;
+	}
+
+	await dbClient.sql(sql);
 }
 
 /**
@@ -116,7 +128,7 @@ async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
 async function updatePlayersData(dbClient, serverId, playerDataArr) {
 	if (playerDataArr === undefined || playerDataArr.length === 0) return;
 
-	let sql = `USE DATABASE ${serverId};`;
+	let sql = `USE DATABASE '${serverId}';`;
 
 	for (const player of playerDataArr) {
 		let updates = '';
@@ -143,7 +155,7 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 		if (updates.length === 0) return;
 
 		updates = updates.slice(0, updates.length - 1);
-		sql += `UPDATE Players SET ${updates} WHERE id = ${player.id};`;
+		sql += `UPDATE Players SET ${updates} WHERE id = '${player.id}';`;
 	}
 
 	await dbClient.sql(sql);
@@ -163,13 +175,14 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
 	for (const player of playerDataAfter) {
 		const matchCount = player.gamesWon + player.gamesLost;
 
+		console.log(`${player.username}: ${matchCount}`);
 		if (matchCount < mapHistoryLength) {
 			// insert new map history
-			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES (${player.id}, ${mapId}, ${matchCount});`;
+			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES ('${player.id}', '${mapId}', '${matchCount}');`;
 		}
 		else {
 			// update map history
-			sql += `UPDATE MapHistory SET map_id=${mapId} WHERE player_id=${player.id} AND map_count=${matchCount % MAP_HISTORY_LENGTH};`;
+			sql += `UPDATE MapHistory SET map_id='${mapId}' WHERE player_id='${player.id}' AND map_count='${matchCount % MAP_HISTORY_LENGTH}';`;
 		}
 	}
 	await sqlClient.sql(sql);
@@ -182,7 +195,7 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
  * @param {PlayerData} playerData new player's data
  */
 async function addPlayer(dbClient, serverId, playerData) {
-	const sql = `USE DATABASE ${serverId}; INSERT INTO Players (id, username, rating, games_won, games_lost) VALUES ('${playerData.id}', '${playerData.username}', ${playerData.rating}, ${playerData.gamesWon}, ${playerData.gamesLost});`;
+	const sql = `USE DATABASE '${serverId}'; INSERT INTO Players (id, username, rating, games_won, games_lost) VALUES ('${playerData.id}', '${playerData.username}', '${playerData.rating}', '${playerData.gamesWon}', '${playerData.gamesLost}');`;
 	await dbClient.sql(sql);
 }
 
@@ -194,7 +207,7 @@ async function addPlayer(dbClient, serverId, playerData) {
  */
 async function getMapsDictByIdWithIndices(dbClient, serverId) {
 	const result = {};
-	const maps = await dbClient.sql`USE DATABASE ${serverId}; SELECT * FROM Maps`;
+	const maps = await dbClient.sql`USE DATABASE '${serverId}'; SELECT * FROM Maps`;
 
 	for (let i = 0; i < maps.length; i++) {
 		result[maps[i].id] = { index: i, name: maps[i].name, id: maps[i].id };
@@ -212,7 +225,7 @@ async function getMapsDictByIdWithIndices(dbClient, serverId) {
  * @param {number} value map preference value
  */
 async function updatePlayerMapPreference(dbClient, serverId, playerId, mapId, value) {
-	const query = `USE DATABASE ${serverId}; INSERT OR REPLACE INTO MapPreferences (player_id, map_id, value) VALUES ('${playerId}', '${mapId}', '${value}');`;
+	const query = `USE DATABASE '${serverId}'; INSERT OR REPLACE INTO MapPreferences (player_id, map_id, value) VALUES ('${playerId}', '${mapId}', '${value}');`;
 	await dbClient.sql(query);
 }
 
@@ -225,7 +238,7 @@ async function updatePlayerMapPreference(dbClient, serverId, playerId, mapId, va
  * @param {number} value map preference value
  */
 async function addPlayerMapPreference(dbClient, serverId, playerId, mapId, value) {
-	const query = `USE DATABASE ${serverId}; INSERT INTO MapPreferences (player_id, map_id, value) VALUES (${playerId}, ${mapId}, ${value});`;
+	const query = `USE DATABASE '${serverId}'; INSERT INTO MapPreferences (player_id, map_id, value) VALUES ('${playerId}', '${mapId}', '${value}');`;
 	await dbClient.sql(query);
 }
 
@@ -255,7 +268,7 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
 		playerIdArr.push(playerDataArr[i].id);
 	}
 
-	const output = await dbClient.sql(`USE DATABASE ${serverId}; SELECT * FROM MapPreferences WHERE player_id IN(${playerIdArr.join(',')}) ORDER BY player_id ASC;`);
+	const output = await dbClient.sql(`USE DATABASE '${serverId}'; SELECT * FROM MapPreferences WHERE player_id IN(${playerIdArr.join(',')}) ORDER BY player_id ASC;`);
 
 	const mapSwitch = await getMapsDictByIdWithIndices(dbClient, serverId);
 
@@ -282,7 +295,7 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
  * @param {number} initialRating initial rating
  */
 async function resetPlayerData(dbClient, guildId, initialRating) {
-	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating='${initialRating}', games_won=0, games_lost=0, accumulated_share=NULL;`;
+	const query = `USE DATABASE '${guildId}'; UPDATE Players SET rating='${initialRating}', games_won=0, games_lost=0, accumulated_share=NULL;`;
 
 	await dbClient.sql(query);
 }
@@ -294,7 +307,7 @@ async function resetPlayerData(dbClient, guildId, initialRating) {
  * @param {string[]} maps
  */
 async function resetMapData(dbClient, guildId, maps) {
-	let query = `USE DATABASE ${guildId}; DELETE FROM MapHistory;`;
+	let query = `USE DATABASE '${guildId}'; DELETE FROM MapHistory;`;
 	const currentMaps = await getMapsDictByIdWithIndices(dbClient, guildId);
 	const mapIdsToDelete = [];
 	const mapNamesToAdd = [];
@@ -333,9 +346,9 @@ async function resetMapData(dbClient, guildId, maps) {
  * @return {Promise<void>}
  */
 async function removePlayerFromDatabase(guildId, dbClient, memberId) {
-	const query = `USE DATABASE ${guildId}; DELETE FROM MapPreferences WHERE player_id = ${memberId}; DELETE FROM Players WHERE id = ${memberId}`;
+	const query = `USE DATABASE '${guildId}'; DELETE FROM MapHistory WHERE player_id='${memberId}'; DELETE FROM MapPreferences WHERE player_id ='${memberId}'; DELETE FROM Players WHERE id ='${memberId}'`;
 
 	await dbClient.sql(query);
 }
 
-module.exports = { resetMapData, updatePlayersMapHistory, updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetPlayerData, addPlayerMapPreference, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };
+module.exports = { createTablesForServer, resetMapData, updatePlayersMapHistory, updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetPlayerData, addPlayerMapPreference, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseTables, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };

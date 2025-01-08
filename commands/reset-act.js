@@ -24,7 +24,7 @@ module.exports = {
 		const maxRole = getHighestPermissionName(interaction, dbRoles);
 
 		if (maxRole === undefined) {
-			interaction.reply({ content: 'Only admins can execute this command!' });
+			interaction.reply({ content: 'Only admins can execute this command!', ephemeral: true });
 			return;
 		}
 

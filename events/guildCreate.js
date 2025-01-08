@@ -25,9 +25,13 @@ module.exports = {
 		// create database for the server
 		const databaseGuildIds = await db.getDatabases(sqlClient);
 		if (databaseGuildIds.has(guild.id)) {
-			await db.dropDatabaseByName(sqlClient, guild.id);
+			await db.dropDatabaseTables(sqlClient, guild.id);
 		}
-		await db.createDatabaseForServer(sqlClient, guild.id);
+		else {
+			await db.createDatabaseForServer(sqlClient, guild.id);
+		}
+
+		await db.createTablesForServer(sqlClient, guild.id);
 
 		// check bot role permissions
 		const botRoleId = guild.members.cache.get(client.user.id).roles.botRole.id;
@@ -41,7 +45,7 @@ module.exports = {
 		// create admin roles
 		let guildIds = new GuildIds(guild.id);
 		if (botRole.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
-			guildIds = await createAdminRoles(guild, client, guildIds);
+			guildIds = await createAndAssignAdminRoles(guild, client, guildIds);
 		}
 
 		// create channels
@@ -86,11 +90,12 @@ async function createValoJsChannels(guild, guildIds) {
  * @param {Guild} guild guild to create roles in
  * @param {Client} client Bot client
  * @param {GuildIds} guildIds guild IDs
- * @returns {GuildIds}
+ * @returns {Promise<GuildIds>}
  */
-async function createAdminRoles(guild, client, guildIds) {
+async function createAndAssignAdminRoles(guild, client, guildIds) {
 	// set highest possible position for admin roles
 	const clientMaxRolePosition = getClientMaxRolePosition(client, guild);
+	const owner = await guild.fetchOwner();
 
 	const superAdminRole = await guild.roles.create({
 		name: SUPER_ADMIN_ROLE_NAME,
@@ -100,6 +105,7 @@ async function createAdminRoles(guild, client, guildIds) {
 		position: clientMaxRolePosition,
 	});
 	guildIds.superAdminRoleId = superAdminRole.id;
+	owner.roles.add(superAdminRole);
 
 	const adminRole = await guild.roles.create({
 		name: ADMIN_ROLE_NAME,
@@ -109,6 +115,7 @@ async function createAdminRoles(guild, client, guildIds) {
 		position: clientMaxRolePosition,
 	});
 	guildIds.adminRoleId = adminRole.id;
+	owner.roles.add(adminRole);
 
 	return guildIds;
 }

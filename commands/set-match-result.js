@@ -53,7 +53,7 @@ module.exports = {
 
 		// convert players in team in dict into one array of players
 		await db.updatePlayersData(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(playerDataAfter.teamTwo));
-		await db.updatePlayersMapHistory(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(matchResult.teamTwo), matchResult.map.id, MAP_HISTORY_LENGTH);
+		await db.updatePlayersMapHistory(sqlClient, interaction.guildId, playerDataAfter.teamOne.concat(playerDataAfter.teamTwo), matchResult.map.id, MAP_HISTORY_LENGTH);
 
 		await interaction.reply(createResultMessage(matchResult, playerDataBefore, playerDataAfter));
 

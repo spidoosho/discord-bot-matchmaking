@@ -15,6 +15,6 @@ module.exports = {
 
 		await sqlDb.updatePlayerMapPreference(sqlClient, interaction.guildId, interaction.user.id, mapId, updatedValue);
 
-		return interaction.reply({ content: `Map preference updated to ${updatedValue}.`, ephemeral: true });
+		return interaction.reply({ content: 'Done.', ephemeral: true });
 	},
 };

@@ -37,11 +37,11 @@ module.exports = {
 		const doesPlayerHaveAdminRole = playerToBan.roles.cache.has(matchmakingManager.getGuildIds(interaction.guildId).superAdminRoleId) ||
 										playerToBan.roles.cache.has(matchmakingManager.getGuildIds(interaction.guildId).adminRoleId);
 
-		if (doesPlayerHaveAdminRole || playerToBan.bannable) {
+		if (doesPlayerHaveAdminRole || !playerToBan.bannable) {
 			return interaction.reply({ content: `You cannot ban player ${playerToBan}.`, ephemeral: true });
 		}
 
-		await interaction.guild.members.ban(playerToBan.id, banReason);
+		await playerToBan.ban({ reason: banReason });
 
 		return interaction.reply({ content: 'Player has been banned.', ephemeral: true });
 	},

@@ -58,11 +58,20 @@ class MatchmakingManager {
 
 	/**
 	 * Retrieves guild's item IDs.
-	 * @param {string} id guild ID
+	 * @param {string} guildId guild ID
 	 * @return {GuildIds} IDs of items in the guild
 	 */
-	getGuildIds(id) {
-		return this.guildManagers[id].guildIds;
+	getGuildIds(guildId) {
+		return this.guildManagers[guildId].guildIds;
+	}
+
+	/**
+	 * Sets guild's IDs.
+	 * @param {string} guildId guild ID
+	 * @param {GuildIds} guildIds guild IDs
+	 */
+	setGuildIds(guildId, guildIds) {
+		this.guildManagers[guildId].guildIds = guildIds;
 	}
 
 	/**
@@ -562,7 +571,7 @@ class GuildManager {
 		const map = playerMapPreferences.maps[mapId];
 
 		assignSelectedMapShareToPlayers(playerMapPreferences, map);
-		const teams = splitPlayers(Object.values(playerMapPreferences.players), COUNT_PLAYERS_GAME);
+		const teams = splitPlayers(Object.values(playerMapPreferences.players), COUNT_PLAYERS_GAME / 2);
 
 		return [textId, this.ongoingMatches.addMatch(textId, voiceId, teams, map, lobbyCreator)];
 	}
@@ -706,12 +715,12 @@ function updatePlayerData(match, winnerTeamId) {
 
 	for (const player of match.teamOne) {
 		const newRating = updatePlayerRating(player.rating, teamTwoRatingAvg, teamOneResult, player.gamesWon + player.gamesLost);
-		result.teamOne.push(new PlayerData(player.id, player.username, player.gamesWon + teamOneResult, player.gamesLost + teamTwoResult, newRating, player.accumulatedShare, player.mapShare));
+		result.teamOne.push(new PlayerData(player.id, player.username, player.gamesLost + teamTwoResult, player.gamesWon + teamOneResult, newRating, player.accumulatedShare, player.mapShare));
 	}
 
 	for (const player of match.teamTwo) {
 		const newRating = updatePlayerRating(player.rating, teamOneRatingAvg, teamTwoResult, player.gamesWon + player.gamesLost);
-		result.teamTwo.push(new PlayerData(player.id, player.username, player.gamesWon + teamTwoResult, player.gamesLost + teamOneResult, newRating, player.accumulatedShare, player.mapShare));
+		result.teamTwo.push(new PlayerData(player.id, player.username, player.gamesLost + teamOneResult, player.gamesWon + teamTwoResult, newRating, player.accumulatedShare, player.mapShare));
 	}
 
 	return result;

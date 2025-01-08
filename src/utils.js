@@ -1,5 +1,6 @@
-const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME } = require('./constants.js');
-const { ChannelType, PermissionsBitField } = require('discord.js');
+const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME,
+	SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_CREATE_REASON, VALOJS_MAIN_CATEGORY_CHANNEL } = require('./constants.js');
+const { Colors, ChannelType, PermissionsBitField } = require('discord.js');
 
 /**
  * Gets highest permission role name based on database and discord roles
@@ -168,4 +169,89 @@ function getClientMaxRolePosition(client, guild) {
 	return clientMember.roles.botRole.position;
 }
 
-module.exports = { factorial, createReadOnlyChannel, getClientMaxRolePosition, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getMentionPlayerMessage, getHighestPermissionName, getChannelByNameFromCategory, getGamesCategoryChannel };
+/**
+ * Check and create admin roles if missing
+ * @param {Client} client Discord client
+ * @param {Guild} guild guild to create roles
+ * @param {GuildIds} guildIds guild IDs
+ * @returns {Promise<GuildIds>}
+ */
+async function checkOrCreateAdminRoles(client, guild, guildIds) {
+	// max possible role position for a role created by the bot
+	const clientMaxRolePosition = getClientMaxRolePosition(client, guild);
+
+	let superAdminRole = guild.roles.cache.find(role => role.id === guildIds.superAdminRoleId);
+	if (guildIds.superAdminRoleId === undefined || superAdminRole === undefined || superAdminRole.position > clientMaxRolePosition) {
+		superAdminRole = await guild.roles.create({
+			name: SUPER_ADMIN_ROLE_NAME,
+			color: Colors.Yellow,
+			reason: SUPER_ADMIN_ROLE_CREATE_REASON,
+			mentionable: true,
+			position: clientMaxRolePosition,
+		});
+
+		guildIds.superAdminRoleId = superAdminRole.id;
+	}
+
+
+	let adminRole = guild.roles.cache.find(role => role.id === guildIds.adminRoleId);
+	if (guildIds.adminRoleId === undefined || adminRole === undefined || adminRole.position > clientMaxRolePosition) {
+		adminRole = await guild.roles.create({
+			name: ADMIN_ROLE_NAME,
+			color: Colors.Orange,
+			mentionable: true,
+			reason: ADMIN_ROLE_CREATE_REASON,
+			position: clientMaxRolePosition,
+		});
+
+		guildIds.adminRoleId = adminRole.id;
+
+	}
+
+	return guildIds;
+}
+
+/**
+ * Checks and creates ValoJS categories if missing
+ * @param {Guild} guild guild to check categories
+ * @param {GuildIds} guildIds guild IDs
+ * @returns {Promise<GuildIds>}
+ */
+async function checkOrCreateValoJSCategories(guild, guildIds, botRoleId) {
+	let valojsCategoryChannel = guild.channels.cache.find(channel => channel.id === guildIds.channelCategoryId && channel.type === ChannelType.GuildCategory);
+	let generalChannel;
+	let matchHistoryChannel;
+	let reportChannel;
+
+	if (valojsCategoryChannel === undefined ||
+		!valojsCategoryChannel.permissionsFor(botRoleId).has([PermissionsBitField.Flags.ManageChannels, PermissionsBitField.Flags.SendMessages])) {
+		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_MAIN_CATEGORY_CHANNEL, undefined, botRoleId, ChannelType.GuildCategory);
+	}
+	else {
+		generalChannel = guild.channels.cache.find(channel => channel.id === guildIds.generalChannelId && channel.parentId === valojsCategoryChannel.id);
+		matchHistoryChannel = guild.channels.cache.find(channel => channel.id === guildIds.matchHistoryChannelId && channel.parentId === valojsCategoryChannel.id);
+		reportChannel = guild.channels.cache.find(channel => channel.id === guildIds.reportChannelId && channel.parentId === valojsCategoryChannel.id);
+	}
+
+	if (generalChannel === undefined) {
+		generalChannel = await createReadOnlyChannel(guild, 'general', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
+	}
+
+	if (matchHistoryChannel === undefined) {
+		matchHistoryChannel = await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
+	}
+
+	if (reportChannel === undefined) {
+		reportChannel = await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
+	}
+
+	guildIds.generalChannelId = generalChannel.id;
+	guildIds.matchHistoryChannelId = matchHistoryChannel.id;
+	guildIds.reportChannelId = reportChannel.id;
+	guildIds.channelCategoryId = valojsCategoryChannel.id;
+
+	return guildIds;
+}
+
+
+module.exports = { checkOrCreateValoJSCategories, checkOrCreateAdminRoles, factorial, createReadOnlyChannel, getClientMaxRolePosition, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getMentionPlayerMessage, getHighestPermissionName, getChannelByNameFromCategory, getGamesCategoryChannel };

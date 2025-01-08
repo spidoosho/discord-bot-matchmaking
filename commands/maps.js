@@ -14,6 +14,6 @@ module.exports = {
 	 */
 	async execute(interaction, args, sqlClient, matchmakingManager) {
 		const maps = matchmakingManager.getMaps(interaction.guildId);
-		return interaction.reply(`Available maps for this server are: ${maps.arrays().join(', ')}`);
+		return interaction.reply(`Available maps for this server are: ${[...maps].join(', ')}`);
 	},
 };
