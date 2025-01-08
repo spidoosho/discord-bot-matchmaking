@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getHighestPermissionName, getChannelByNameFromCategory } = require('../src/utils.js');
+const { getHighestPermissionName } = require('../src/utils.js');
 const db = require('../src/sqliteDatabase.js');
 const { START_ELO, VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
 
@@ -45,7 +45,7 @@ module.exports = {
 		await db.resetPlayerData(sqlClient, interaction.guildId, START_ELO);
 		matchmakingManager.setMaps(interaction.guildId, maps);
 
-		const generalChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'general');
+		const generalChannel = interaction.guild.channels.cache.find(channel => channel.id === matchmakingManager.getGuildIds(interaction.guildId).generalChannelId);
 		await generalChannel.send({ content: `Act reset. New map rotation: ${maps.join(', ')}` });
 
 		return interaction.reply({ content: 'Act reset.', ephemeral: true });

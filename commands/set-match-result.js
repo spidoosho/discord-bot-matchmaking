@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, ChannelType, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder, StringSelectMenuOptionBuilder, EmbedBuilder, ChatInputCommandInteraction } = require('discord.js');
-const { VALOJS_MAIN_CATEGORY_CHANNEL, MAP_HISTORY_LENGTH } = require('../src/constants.js');
-const { getChannelByNameFromCategory, getMentionPlayerMessage, getHighestPermissionName } = require('../src/utils.js');
+const { MAP_HISTORY_LENGTH } = require('../src/constants.js');
+const { getHighestPermissionName, getMentionPlayerMessage } = require('../src/utils.js');
 
 const db = require('../src/sqliteDatabase.js');
 const { PlayerData } = require('../src/gameControllers.js');
@@ -57,7 +57,7 @@ module.exports = {
 
 		await interaction.reply(createResultMessage(matchResult, playerDataBefore, playerDataAfter));
 
-		const matchHistoryChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'match-history');
+		const matchHistoryChannel = interaction.guild.channels.cache.find(channel => channel.id === matchmakingManager.getGuildIds(interaction.guildId).matchHistoryChannelId);
 		await matchHistoryChannel.send(createMatchHistoryMessage(matchResult));
 
 		setTimeout(async () => {

@@ -88,18 +88,6 @@ async function getGamesCategoryChannel(guild, botId) {
 }
 
 /**
- * Gets channel by name from category
- * @param {Guild} guild guild to retrieve channel
- * @param {string} categoryName category name
- * @param {string} channelName channel name
- * @returns {Channel|undefined}
- */
-function getChannelByNameFromCategory(guild, categoryName, channelName) {
-	const category = guild.channels.cache.find(channel => channel.name === categoryName && channel.type === ChannelType.GuildCategory);
-	return guild.channels.cache.find(channel => channel.name === channelName && channel.parentId === category.id);
-}
-
-/**
  * Gets string that mention players
  * @param {PlayerData[]} players player data
  * @returns {string}
@@ -254,4 +242,4 @@ async function checkOrCreateValoJSCategories(guild, guildIds, botRoleId) {
 }
 
 
-module.exports = { checkOrCreateValoJSCategories, checkOrCreateAdminRoles, factorial, createReadOnlyChannel, getClientMaxRolePosition, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getMentionPlayerMessage, getHighestPermissionName, getChannelByNameFromCategory, getGamesCategoryChannel };
+module.exports = { checkOrCreateValoJSCategories, checkOrCreateAdminRoles, factorial, createReadOnlyChannel, getClientMaxRolePosition, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getMentionPlayerMessage, getHighestPermissionName, getGamesCategoryChannel };

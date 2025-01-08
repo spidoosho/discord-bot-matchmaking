@@ -167,7 +167,7 @@ class MatchmakingManager {
 	 * Cancels and removes lobby from GuildManager.
 	 * @param {string} guildId guild ID
 	 * @param {string} textId text channel ID from which was cancellation requested
-	 * @return {string[]} array of channel IDs of the match
+	 * @return {string[]|undefined} array of channel IDs of the match
 	 */
 	cancelMatch(guildId, textId) {
 		return this.guildManagers[guildId].cancelMatch(textId);
@@ -501,10 +501,13 @@ class GuildManager {
 	/**
 	 * Cancels and removes lobby from GuildManager.
 	 * @param {string} textId text channel ID from which was cancellation requested
-	 * @return {string[]} array of channel IDs of the match
+	 * @return {string[]|undefined} array of channel IDs of the match
 	 */
 	cancelMatch(textId) {
 		const match = this.ongoingMatches.getMatch(textId);
+
+		if (match === undefined) return undefined;
+
 		for (const player of match.teamOne.concat(match.teamTwo)) {
 			this.playersInMatchmaking.delete(player.id);
 		}
@@ -522,7 +525,7 @@ class GuildManager {
 	substitutePlayerInLobby(lobbyId, playerId, substitutePlayerData) {
 		const substituted = this.voiceChannelLobbies.substitutePlayer(lobbyId, playerId, substitutePlayerData);
 
-		if (!substituted) return substituted;
+		if (substituted === undefined || !substituted) return false;
 
 		this.playersInMatchmaking.delete(playerId);
 		this.playersInMatchmaking.add(substitutePlayerData.id);

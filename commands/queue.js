@@ -28,7 +28,7 @@ module.exports = {
 			return interaction.reply({ content: 'Bot is not ready for matchmaking. Waiting for Bot permissions.', ephemeral: true });
 		}
 
-		const mapSet = matchmakingManager.getMaps(interaction.guildId);
+		const mapSet = matchmakingManager.getMaps(guildId);
 
 		if (mapSet.size === 0) {
 			return interaction.reply({ content: 'No maps have been set for this server.', ephemeral: true });

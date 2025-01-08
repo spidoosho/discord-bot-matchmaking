@@ -173,7 +173,7 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, mapId, mapHistoryLength) {
 	let sql = `USE DATABASE ${serverId};`;
 	for (const player of playerDataAfter) {
-		const matchCount = player.gamesWon + player.gamesLost;
+		const matchCount = player.gamesWon + player.gamesLost - 1;
 
 		if (matchCount < mapHistoryLength) {
 			// insert new map history

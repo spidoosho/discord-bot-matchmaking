@@ -1,6 +1,6 @@
 const { PermissionsBitField } = require('discord.js');
 
-exports.COUNT_PLAYERS_GAME = 4;
+exports.COUNT_PLAYERS_GAME = 10;
 exports.RANDOM_MAP_SHARE = 0.5;
 exports.MAP_HISTORY_LENGTH = 5;
 exports.COMMAND = 'command';
@@ -15,7 +15,6 @@ exports.ADMIN_ROLE_CREATE_REASON = 'ValoJs needs a role for admin';
 exports.VALOJS_GAME_CATEGORY_NAME = 'VALOJS GAMES';
 exports.VALOJS_MAIN_CATEGORY_CHANNEL = 'VALOJS';
 exports.CATEGORY_MAX_CHANNEL_SIZE = 50;
-exports.DATABASE_TABLES = ['Maps', 'GuildIds', 'Players', 'MapPreferences', 'MapHistory'];
 exports.BOT_PERMISSIONS = new PermissionsBitField([
 	PermissionsBitField.Flags.ViewChannel,
 	PermissionsBitField.Flags.SendMessages,
