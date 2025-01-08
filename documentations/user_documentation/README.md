@@ -4,7 +4,7 @@ You will learn how to add and use Discord bot to your Discord server. You can al
 
 ## Adding bot to your server
 
-1. Open [this link](https://discord.com/oauth2/authorize?client_id=1082686062360526939) requesting your confirmation to add bot to your server. Discord bot needs some permissions to create commands and retrieving users' IDs for saving user game data.
+1. Open [this link](https://discord.com/oauth2/authorize?client_id=1322612015474147429) requesting your confirmation to add bot to your server. Discord bot needs some permissions to create commands and retrieving users' IDs for saving user game data.
 2. That's all the steps!
 
 ## Getting into a match making
@@ -37,13 +37,61 @@ You will be removed from the queue.
 
 Bot will write down a message with current leaderboard of your server.
 
-### `/me`
+### `/stats`
 
 Bot will display your user data including elo, match record and map preferences.
 
-### `/resetmappreferences`
+### `/change-maps-preferences`
 
 Bot will give you an option to change any of the map preferences from 1 - the worst to 10 - the best.
+
+### `/add-admin`
+
+[Super Admins Only] Add ValoJs role to admin.
+
+### `/ban-player`
+
+[Admins Only] Ban player from the server.
+
+### `/cancel-lobby`
+
+[Admins Only] Cancel created lobby.
+
+### `/cancel-match`
+
+[Admins Only] Cancel ongoing match.
+
+### `/example`
+
+This is a description for the example command.
+
+### `/help`
+
+Lists all available commands.
+
+### `/maps`
+
+Show available maps.
+
+### `/remove-admin`
+
+[Super Admins Only] Remove ValoJs role to admin.
+
+### `/report-player`
+
+Report a player.
+
+### `/reset-act`
+
+[Admins Only] Reset current act leaderboard.
+
+### `/set-match-result`
+
+[Admins only]: Set lobby match result.
+
+### `/sub-player`
+
+[Super Admins Only] Add ValoJs role to admin.
 
 ## Adding bot data to your Twitch stream using Fossabot
 
@@ -65,11 +113,11 @@ If you want to add Fossabot commands with the bot data, then:
 2. Add new command with your desired command name and the response should be:
    - For server leaderboard (replace `DISCORD_SERVER_ID` with the server ID):
 
-   ```$(eval $(urlfetch https://discord-bot-matchmaking.onrender.com/leaderboard/DISCORD_SERVER_ID/text))```
+   ```$(eval $(urlfetch https://valojs.onrender.com/server/DISCORD_SERVER_ID/text))```
 
    - For player stats (replace `DISCORD_SERVER_ID` with the server ID and `DISCORD_USER_ID` with the player ID):
   
-    ```$(eval $(urlfetch discord-bot-matchmaking.onrender.com/DISCORD_SERVER_ID/DISCORD_USER_ID/text))```
+    ```$(eval $(urlfetch https://valojs.onrender.com/server/DISCORD_SERVER_ID/player/DISCORD_USER_ID/text))```
 
 ## Leaderboard website
 
@@ -78,7 +126,3 @@ You can find your leaderboard website using your Discord server ID ([Guide above
 ```
 https://discord-bot-matchmaking.onrender.com/DISCORD_SERVER_ID
 ```
-
-## Advanced options
-
-If you want to add something else to the Discord bot, you can edit the Discord bot! Guide is in the [developer documentation](https://github.com/spiduso/discord-bot-matchmaking/blob/main/documentations/developer_documentation/README.md).

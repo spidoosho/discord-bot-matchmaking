@@ -175,7 +175,6 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
 	for (const player of playerDataAfter) {
 		const matchCount = player.gamesWon + player.gamesLost;
 
-		console.log(`${player.username}: ${matchCount}`);
 		if (matchCount < mapHistoryLength) {
 			// insert new map history
 			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES ('${player.id}', '${mapId}', '${matchCount}');`;

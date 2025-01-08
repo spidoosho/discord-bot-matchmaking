@@ -35,7 +35,6 @@ module.exports = {
 
 		const member = interaction.options.getMember('user');
 
-		console.log(dbRoles.adminRoleId);
 		if (member.roles.cache.has(dbRoles.adminRoleId)) {
 			return interaction.reply({ content: `Member <@${member.id}> is already a <@&${dbRoles.adminRoleId}>.`, ephemeral: true });
 		}
