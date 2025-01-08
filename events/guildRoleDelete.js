@@ -19,11 +19,17 @@ module.exports = {
 	async execute(args, client, sqlClient, matchmakingManager) {
 		const [role] = args;
 
+		if (role.managed) {
+			// bot role deletion cannot be handled
+			return;
+		}
+
 		const guildIds = matchmakingManager.getGuildIds(role.guild.id);
 
 		// check if admin roles are mentionable
 		if (![guildIds.superAdminRoleId, guildIds.adminRoleId].includes(role.id)) return;
 
+		// check the audit log for the deleted role
 		const fetchedLogs = await role.guild.fetchAuditLogs({
 			type: AuditLogEvent.RoleDelete,
 			limit: 10,
@@ -52,6 +58,12 @@ module.exports = {
 	},
 };
 
+/**
+ * Creates a new admin role to replace the deleted one.
+ * @param {Role} deletedRole deleted role
+ * @param {GuildIds} guildIds guild IDs
+ * @returns {Role} created role
+ */
 async function createMissingAdminRole(deletedRole, guildIds) {
 	let newRoleName = ADMIN_ROLE_NAME;
 	let newRoleColor = Colors.Orange;

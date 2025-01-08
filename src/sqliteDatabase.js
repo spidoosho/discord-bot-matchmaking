@@ -5,7 +5,7 @@ const { convertSnakeCaseToCamelCase, convertCamelCaseToSnakeCase } = require('./
 
 /**
  * Create database and needed tables for the server
- * @param {Database} dbClient Sqlitecloud client
+ * @param {Database} dbClient SQLiteCloud client
  * @param {string} serverId serverId
  */
 async function createDatabaseForServer(dbClient, serverId) {
@@ -15,7 +15,7 @@ async function createDatabaseForServer(dbClient, serverId) {
 
 /**
  * Get roles from the database
- * @param {Database} dbClient Sqlitecloud client
+ * @param {Database} dbClient SQLiteCloud client
  * @param {string} serverId serverId
  * @returns {Promise<Object<string, string>>} roles in database. key:roleName, value:roleId
  */
@@ -34,7 +34,7 @@ async function getGuildDbIds(dbClient, serverId) {
 }
 
 /**
- *
+ * Update guild IDs in the database.
  * @param {Database} dbClient
  * @param {string} serverId
  * @param {GuildIds} guildIds
@@ -52,34 +52,8 @@ async function updateGuildIds(dbClient, serverId, guildIds) {
 }
 
 /**
- * Update or add roles to the database based on newly assigned roles
- * @param {Database} dbClient Sqlitecloud client
- * @param {string} serverId serverId
- * @param {Object<string, string>} oldRoles roles in database. key:roleName, value:roleId
- * @param {Object<string, string>} newRoles roles in Discord. key:roleName, value:roleId
- */
-async function addOrUpdateRoles(dbClient, serverId, oldRoles, newRoles) {
-	let sql = `USE DATABASE ${serverId};`;
-	for (const newRoleName of Object.keys(newRoles)) {
-		if (newRoleName in oldRoles) {
-			// new role id and old role id is equal => no action needed
-			if (newRoles[newRoleName] === oldRoles[newRoleName]) continue;
-
-			// update role id
-			sql += `UPDATE Roles SET id='${newRoles[newRoleName]}' WHERE name='${newRoleName}';`;
-		}
-		else {
-			// add new role
-			sql += `INSERT INTO Roles (id, name) VALUES ('${newRoles[newRoleName]}', '${newRoleName}');`;
-		}
-	}
-
-	await dbClient.sql(sql);
-}
-
-/**
  * Get database names in the cloud.
- * @param {Database} dbClient Sqlitecloud client
+ * @param {Database} dbClient SQLiteCloud client
  * @returns {Promise<Set<string>>} database names
  */
 async function getDatabases(dbClient) {
@@ -95,23 +69,22 @@ async function getDatabases(dbClient) {
 
 /**
  * Drop database and tables of the server
- * @param {Database} dbClient Sqlitecloud client
+ * @param {Database} dbClient SQLiteCloud client
  * @param {string} serverId serverId
  */
 async function dropDatabaseByName(dbClient, serverId) {
 	const databases = await getDatabases(dbClient);
-
 	if (!databases.has(serverId)) return;
 
-	await dbClient.sql`DISABLE DATABASE ${serverId}; REMOVE DATABASE ${serverId}`;
-
-	return;
+	const removeSql = `REMOVE DATABASE ${serverId}`;
+	return dbClient.sql(removeSql);
 }
 
 /**
  * Returns players' data, sorted by rating descending. If player ID array is not defined, all players are returned.
  * @param {Database} dbClient Sqlitecloud client
  * @param {string} serverId serverId
+ * @param {string[]} playerIdArr player IDs
  * @return {Promise<PlayerData[]>} players' data
  */
 async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
@@ -119,7 +92,7 @@ async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
 	let wherePlayerClause = '';
 
 	if (playerIdArr !== undefined) {
-		if (playerIdArr.length == 0) return;
+		if (playerIdArr.length === 0) return [];
 
 		wherePlayerClause = `WHERE id IN ('${playerIdArr.join('\',\'')}')`;
 	}
@@ -136,7 +109,7 @@ async function getPlayerData(dbClient, serverId, playerIdArr = undefined) {
 
 /**
  * Update players data to database.
- * @param {Database} dbClient Sqlitecloud client
+ * @param {Database} dbClient SQLiteCloud client
  * @param {string} serverId serverId
  * @param {PlayerData[]} playerDataArr array of PlayerData with updated values
  */
@@ -151,12 +124,14 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 		for (const key in player) {
 			if (key === 'accumulatedShare' && player.mapShare !== undefined) {
 				if (player.accumulatedShare === undefined) {
+					// initialize accumulated share
 					player.accumulatedShare = 0;
 				}
 
 				player.accumulatedShare += player.mapShare;
 			}
 			else if (player[key] === undefined || ['id', 'mapShare'].includes(key)) {
+				// skip undefined values
 				continue;
 			}
 
@@ -174,15 +149,26 @@ async function updatePlayersData(dbClient, serverId, playerDataArr) {
 	await dbClient.sql(sql);
 }
 
+/**
+ * Update players' map history.
+ * @param {Database} sqlClient SQLiteCloud client
+ * @param {string} serverId server ID
+ * @param {PlayerData[]} playerDataAfter player data after the match
+ * @param {string} mapId map ID
+ * @param {number} mapHistoryLength number of matches to keep in the history
+ * @return {Promise<void>}
+ */
 async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, mapId, mapHistoryLength) {
 	let sql = `USE DATABASE ${serverId};`;
 	for (const player of playerDataAfter) {
 		const matchCount = player.gamesWon + player.gamesLost;
 
 		if (matchCount < mapHistoryLength) {
+			// insert new map history
 			sql += `INSERT INTO MapHistory (player_id, map_id, map_count) VALUES (${player.id}, ${mapId}, ${matchCount});`;
 		}
 		else {
+			// update map history
 			sql += `UPDATE MapHistory SET map_id=${mapId} WHERE player_id=${player.id} AND map_count=${matchCount % MAP_HISTORY_LENGTH};`;
 		}
 	}
@@ -198,28 +184,6 @@ async function updatePlayersMapHistory(sqlClient, serverId, playerDataAfter, map
 async function addPlayer(dbClient, serverId, playerData) {
 	const sql = `USE DATABASE ${serverId}; INSERT INTO Players (id, username, rating, games_won, games_lost) VALUES ('${playerData.id}', '${playerData.username}', ${playerData.rating}, ${playerData.gamesWon}, ${playerData.gamesLost});`;
 	await dbClient.sql(sql);
-}
-
-/**
- * Adds new map to the database
- * @param {Database} dbClient Sqlitecloud client
- * @param {string} guildId guild ID
- * @param {string} newMapName map to be added
- */
-async function addMap(dbClient, serverId, newMapName) {
-	const query = `USE DATABASE ${serverId}; INSERT INTO Maps (name) VALUES ('${newMapName}')`;
-	await dbClient.sql(query);
-}
-
-/**
- * Removes a map to the database
- * @param {Database} dbClient Sqlitecloud client
- * @param {string} guildId guild ID
- * @param {string} mapId map ID
- */
-async function removeMap(dbClient, serverId, mapId) {
-	const query = `USE DATABASE ${serverId}; DELETE FROM MapPreferences WHERE map_id = ${mapId}; DELETE FROM Maps WHERE id = ${mapId};`;
-	await dbClient.sql(query);
 }
 
 /**
@@ -315,6 +279,7 @@ async function getMapsPreferencesData(dbClient, serverId, playerDataArr) {
  * Reset counters in Players table
  * @param {Database} dbClient Sqlitecloud client
  * @param {string} guildId guild ID
+ * @param {number} initialRating initial rating
  */
 async function resetPlayerData(dbClient, guildId, initialRating) {
 	const query = `USE DATABASE ${guildId}; UPDATE Players SET rating='${initialRating}', games_won=0, games_lost=0, accumulated_share=NULL;`;
@@ -323,7 +288,7 @@ async function resetPlayerData(dbClient, guildId, initialRating) {
 }
 
 /**
- *
+ * Reset database map data based on the list of maps to keep.
  * @param {Database} dbClient
  * @param {string} guildId
  * @param {string[]} maps
@@ -360,10 +325,17 @@ async function resetMapData(dbClient, guildId, maps) {
 	await dbClient.sql(query);
 }
 
+/**
+ * Remove player from the database.
+ * @param {string} guildId guild ID
+ * @param {Database} dbClient SQLiteCloud client
+ * @param {string} memberId player ID
+ * @return {Promise<void>}
+ */
 async function removePlayerFromDatabase(guildId, dbClient, memberId) {
 	const query = `USE DATABASE ${guildId}; DELETE FROM MapPreferences WHERE player_id = ${memberId}; DELETE FROM Players WHERE id = ${memberId}`;
 
 	await dbClient.sql(query);
 }
 
-module.exports = { resetMapData, updatePlayersMapHistory, updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetPlayerData, addMap, removeMap, addPlayerMapPreference, addOrUpdateRoles, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };
+module.exports = { resetMapData, updatePlayersMapHistory, updateGuildIds, getDatabases, removePlayerFromDatabase, getGuildDbIds, resetPlayerData, addPlayerMapPreference, getMapsDictByIdWithIndices, createDatabaseForServer, dropDatabaseByName, getPlayerData, updatePlayersData, addPlayer, updatePlayerMapPreference, getMapsPreferencesData };

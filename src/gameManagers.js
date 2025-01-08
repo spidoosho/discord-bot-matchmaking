@@ -28,6 +28,24 @@ class MatchmakingManager {
 	}
 
 	/**
+	 * Checks if guild is ready to start matchmaking.
+	 * @param {string} guildId guild ID
+	 * @return {boolean}
+	 */
+	isGuildReady(guildId) {
+		return this.guildManagers[guildId].isGuildReady();
+	}
+
+	/**
+	 * Sets guild ready to start matchmaking.
+	 * @param {string} guildId guild ID
+	 * @param {boolean} ready status
+	 */
+	setGuildReady(guildId, ready) {
+		this.guildManagers[guildId].setGuildReady(ready);
+	}
+
+	/**
 	 * Checks if guild ID is in the manager.
 	 * If yes, then removes it.
 	 * @param {string} id guild ID
@@ -47,10 +65,20 @@ class MatchmakingManager {
 		return this.guildManagers[id].guildIds;
 	}
 
+	/**
+	 * Gets guild's maps.
+	 * @param {string} guildId guild ID
+	 * @return {Set<string>}
+	 */
 	getMaps(guildId) {
 		return this.guildManagers[guildId].getMaps();
 	}
 
+	/**
+	 * Sets guild's maps.
+	 * @param {string} guildId guild ID
+	 * @param {Set<string>} maps set of map names
+	 */
 	setMaps(guildId, maps) {
 		return this.guildManagers[guildId].setMaps(maps);
 	}
@@ -65,6 +93,12 @@ class MatchmakingManager {
 		return this.guildManagers[guildId].isPlayerInQueue(playerId);
 	}
 
+	/**
+	 * Checks if a player is in guild's matchmaking.
+	 * @param {string} guildId guild ID
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
 	isPlayerInMatchmaking(guildId, playerId) {
 		return this.guildManagers[guildId].isPlayerInMatchmaking(playerId);
 	}
@@ -90,7 +124,8 @@ class MatchmakingManager {
 
 	/**
 	 * Retrieves guild's unique ID for a new lobby.
-	 * @param guildId guild ID
+	 * @param {string} guildId guild ID
+	 * @param {Set<string>} currentIds set of current lobby IDs
 	 * @return {number}
 	 */
 	getUniqueLobbyId(guildId, currentIds) {
@@ -176,7 +211,7 @@ class MatchmakingManager {
 	 * Starts a guild's match.
 	 * @param {string} guildId guild ID
 	 * @param {string} voiceId voice ID
-	 * @param {PlayerMapPreferences} playerMapsPreferences
+	 * @param {Object} playerMapsPreferences
 	 * @return {[string, Match]} voice channel ID and match instance
 	 */
 	startMatch(guildId, voiceId, playerMapsPreferences) {
@@ -190,7 +225,7 @@ class MatchmakingManager {
 	 * @return {PlayerData[]} array of player data
 	 */
 	getPlayers(guildId, voiceId) {
-		return this.guildManagers[guildId].getPlayers(voiceId);
+		return this.guildManagers[guildId].getPlayersFromLobby(voiceId);
 	}
 
 	getLobby(guildId, textId) {
@@ -205,7 +240,7 @@ class MatchmakingManager {
 	 * @return {boolean}
 	 */
 	canPlayerSetGameResult(guildId, gameId, playerId) {
-		return this.guildManagers[guildId].canPlayerSetGameResult(gameId, playerId);
+		return this.guildManagers[guildId].canPlayerSetMatchResult(gameId, playerId);
 	}
 
 	/**
@@ -241,7 +276,7 @@ class MatchmakingManager {
 	 * @return {[string, PlayerData[]]} player's team name, player data of the opposing team
 	 */
 	setGameResultSubmitter(guildId, gameId, playerId, winnerId) {
-		return this.guildManagers[guildId].setGameResultSubmitter(gameId, playerId, winnerId);
+		return this.guildManagers[guildId].setMatchResultSubmitter(gameId, playerId, winnerId);
 	}
 
 	/**
@@ -301,14 +336,24 @@ class GuildManager {
 		 * @type {Set<string>}
 		 */
 		this.maps = new Set();
+		/**
+		 * @type {boolean}
+		 */
+		this.isReady = false;
 	}
 
+	/**
+	 * Retrieves unique lobby ID for the guild.
+	 * @param {Set<number>} currentIds set of current lobby IDs
+	 * @return {number}
+	 */
 	getUniqueLobbyId(currentIds) {
 		while (currentIds.has(this.lobbyId) && this.lobbyId < 1000) {
 			this.lobbyId++;
 		}
 
 		if (this.lobbyId > 999) {
+			// reset counter
 			this.lobbyId = 1;
 			while (currentIds.has(this.lobbyId)) {
 				this.lobbyId++;
@@ -320,26 +365,70 @@ class GuildManager {
 		return lobbyId;
 	}
 
+	/**
+	 * Checks if guild is ready to start matchmaking.
+	 * @return {boolean}
+	 */
+	isGuildReady() {
+		return this.isReady;
+	}
+
+	/**
+	 * Sets guild ready to start matchmaking.
+	 * @param ready status
+	 */
+	setGuildReady(ready) {
+		this.isReady = ready;
+	}
+
+	/**
+	 * Gets guild's maps.
+	 * @return {Set<string>}
+	 */
 	getMaps() {
 		return this.maps;
 	}
 
+	/**
+	 * Sets guild's maps.
+	 * @param {Set<string>} maps set of map names
+	 */
 	setMaps(maps) {
 		this.maps = new Set(maps);
 	}
 
+	/**
+	 * Retrieves lobby by text channel ID.
+	 * @param {string} textId text channel ID
+	 * @return {VoiceLobby}
+	 */
 	getLobby(textId) {
 		return this.voiceChannelLobbies.getLobbyByTextId(textId);
 	}
 
+	/**
+	 * Checks if player is in guild's queue.
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
 	isPlayerInQueue(playerId) {
 		return this.playersInQueue.isPlayerInQueue(playerId);
 	}
 
+	/**
+	 * Checks if player is in guild's matchmaking.
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
 	isPlayerInMatchmaking(playerId) {
 		return this.playersInMatchmaking.has(playerId);
 	}
 
+	/**
+	 * Enqueues player to guild's queue.
+	 * @param {PlayerData} playerData player Data
+	 * @return {[number,boolean]} Number of players in guild's queue and if there is enough players for a lobby
+	 */
 	enqueuePlayer(playerData) {
 		this.playersInQueue.addPlayer(playerData);
 		this.playersInMatchmaking.add(playerData.id);
@@ -347,15 +436,31 @@ class GuildManager {
 		return [this.playersInQueue.getPlayersCount(), this.isThereEnoughPlayersForMatch()];
 	}
 
+	/**
+	 * Removes player from guild's queue.
+	 * @param {string} playerId player ID
+	 */
 	dequeuePlayer(playerId) {
 		this.playersInMatchmaking.delete(playerId);
 		this.playersInQueue.removePlayer(playerId);
 	}
 
+	/**
+	 * Checks if there are enough players for a match.
+	 * @return {boolean}
+	 */
 	isThereEnoughPlayersForMatch() {
-		return this.playersInQueue.isThereEnoughPlayersForGame();
+		return this.playersInQueue.isThereEnoughPlayersForMatch();
 	}
 
+	/**
+	 * Creates a lobby in the GuildManager.
+	 * @param {string} guildId guild ID
+	 * @param {string} voiceId voice channel ID
+	 * @param {string} textId text channel ID
+	 * @param {Database} dbClient SQLiteCloud client
+	 * @return {Promise<VoiceLobby>}
+	 */
 	async createLobby(guildId, voiceId, textId, dbClient) {
 		const playersArr = this.playersInQueue.extractPlayers();
 		const mapsPreferences = await db.getMapsPreferencesData(dbClient, guildId, playersArr);
@@ -399,7 +504,7 @@ class GuildManager {
 	}
 
 	/**
-	 *
+	 * Replaces player in the lobby with a substitute.
 	 * @param lobbyId
 	 * @param playerId
 	 * @param substitutePlayerData
@@ -415,18 +520,40 @@ class GuildManager {
 		return substituted;
 	}
 
+	/**
+	 * Return's guild number of active lobbies and matches.
+	 * @return {[number, number]}
+	 */
 	getLobbyAndMatchCount() {
 		return [this.voiceChannelLobbies.getLobbyCount(), this.ongoingMatches.getMatchCount()];
 	}
 
+	/**
+	 * Adds vote in guild's map selection in the lobby.
+	 * @param {string} lobbyId lobby ID
+	 * @param {string} playerId player ID
+	 * @param {string} mapId map ID
+	 * @return {boolean}
+	 */
 	addVote(lobbyId, playerId, mapId) {
 		return this.voiceChannelLobbies.addVote(lobbyId, playerId, mapId);
 	}
-
+	/**
+	 * Checks if player is in guild's lobby.
+	 * @param {string} voiceId voice channel ID
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
 	isPlayerInLobby(voiceId, playerId) {
 		return this.voiceChannelLobbies.isPlayerInLobby(voiceId, playerId);
 	}
 
+	/**
+	 * Starts a guild's match.
+	 * @param {string} voiceId voice channel ID
+	 * @param {Object} playerMapPreferences player map preferences
+	 * @return {[string,Match]} text channel ID and match data
+	 */
 	startMatch(voiceId, playerMapPreferences) {
 		const [textId, voiceLobby] = this.voiceChannelLobbies.removeLobby(voiceId);
 
@@ -435,27 +562,58 @@ class GuildManager {
 		const map = playerMapPreferences.maps[mapId];
 
 		assignSelectedMapShareToPlayers(playerMapPreferences, map);
-		const teams = splitPlayers(Object.values(playerMapPreferences.players), COUNT_PLAYERS_GAME, map);
+		const teams = splitPlayers(Object.values(playerMapPreferences.players), COUNT_PLAYERS_GAME);
 
 		return [textId, this.ongoingMatches.addMatch(textId, voiceId, teams, map, lobbyCreator)];
 	}
 
-	getPlayers(voiceId) {
-		return this.voiceChannelLobbies.getPlayers(voiceId);
+	/**
+	 * Get players from guild's lobby.
+	 * @param {string} voiceId voice ID
+	 * @return {PlayerData[]}
+	 */
+	getPlayersFromLobby(voiceId) {
+		return this.voiceChannelLobbies.getPlayersFromLobby(voiceId);
 	}
 
+	/**
+	 * Checks if player can set guild's match result.
+	 * @param {string} gameId game ID
+	 * @return {Match|undefined}
+	 */
 	getMatch(gameId) {
 		return this.ongoingMatches.getMatch(gameId);
 	}
 
-	canPlayerSetGameResult(gameId, playerId) {
-		return this.ongoingMatches.canPlayerSetGameResult(gameId, playerId);
+	/**
+	 * Checks if player can set guild's match.
+	 * @param {string} gameId game ID
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
+	canPlayerSetMatchResult(gameId, playerId) {
+		return this.ongoingMatches.canPlayerSetMatchResult(gameId, playerId);
 	}
 
-	setGameResultSubmitter(gameId, playerId, winnerId) {
-		return this.ongoingMatches.setGameResultSubmitter(gameId, playerId, winnerId);
+	/**
+	 * Sets guild's match result.
+	 * @param {string} gameId game ID
+	 * @param {string} playerId player ID
+	 * @param {string} winnerId winner ID
+	 * @return {[string,PlayerData[]]|undefined}
+	 */
+	setMatchResultSubmitter(gameId, playerId, winnerId) {
+		return this.ongoingMatches.setMatchResultSubmitter(gameId, playerId, winnerId);
 	}
 
+	/**
+	 * Set match winner
+	 * @param {string} gameId game ID
+	 * @param {string} winnerTeamId winner team ID
+	 * @param {string} submitId submit player ID
+	 * @param {boolean} playerConfirmed if player confirmed, otherwise admin confirmed
+	 * @return {[Match,{teamTwo: PlayerData[], teamOne: PlayerData[]}|{teamTwo: PlayerData[], teamOne: PlayerData[]}]}
+	 */
 	setMatchWinner(gameId, winnerTeamId, submitId, playerConfirmed) {
 		const match = this.ongoingMatches.getMatch(gameId);
 		if (match === undefined ||
@@ -477,10 +635,21 @@ class GuildManager {
 		return [matchResult, outdatedPlayerData, updatedPlayerData];
 	}
 
+	/**
+	 * Adds new voice channels to the guild's match
+	 * @param {string} gameId game ID
+	 * @param {Object[]} voiceChannels voice channels data
+	 */
 	addVoiceChannelsToMatch(gameId, voiceChannels) {
 		this.ongoingMatches.addVoiceChannels(gameId, voiceChannels);
 	}
 
+	/**
+	 * Reject submitted match result.
+	 * @param {string} gameId game ID
+	 * @param {string} playerId player ID
+	 * @return {boolean|undefined}
+	 */
 	rejectMatchResult(gameId, playerId) {
 		const match = this.ongoingMatches.getMatch(gameId);
 		if (match === undefined ||
@@ -493,6 +662,11 @@ class GuildManager {
 	}
 }
 
+/**
+ * Assigns selected map share to players
+ * @param {Object} playerMapPreferences player map preferences
+ * @param {Object} map map data
+ */
 function assignSelectedMapShareToPlayers(playerMapPreferences, map) {
 	for (const player of Object.values(playerMapPreferences.players)) {
 		if (isNaN(playerMapPreferences.matrix[player.matrixIndex][map.index])) {
@@ -503,6 +677,12 @@ function assignSelectedMapShareToPlayers(playerMapPreferences, map) {
 	}
 }
 
+/**
+ * Updates player data after the match
+ * @param {Match} match match data
+ * @param {string} winnerTeamId winner team ID
+ * @return {{teamTwo: PlayerData[], teamOne: PlayerData[]}}
+ */
 function updatePlayerData(match, winnerTeamId) {
 	const result = { teamOne: [], teamTwo: [] };
 

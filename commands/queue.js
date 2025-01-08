@@ -24,6 +24,10 @@ module.exports = {
 			guildId = args[0];
 		}
 
+		if (matchmakingManager.isGuildReady(guildId) === false) {
+			return interaction.reply({ content: 'Bot is not ready for matchmaking. Waiting for Bot permissions.', ephemeral: true });
+		}
+
 		const mapSet = matchmakingManager.getMaps(interaction.guildId);
 
 		if (mapSet.size === 0) {

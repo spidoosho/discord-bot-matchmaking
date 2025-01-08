@@ -17,17 +17,18 @@ module.exports = {
 	 */
 	async execute(args, client, sqlClient, matchmakingManager) {
 		const [oldRole, newRole] = args;
+
+		// if not bot role or if permissions did not change, then skip
+		if (newRole.tags === null || !('botId' in newRole.tags) || oldRole.permissions.equals(newRole.permissions)) {
+			return;
+		}
+
 		const adminRoles = matchmakingManager.getGuildIds(newRole.guild.id);
 
 		// check if admin roles are mentionable
 		if (Object.values(adminRoles).includes(newRole.id) && !newRole.mentionable) {
 			const owner = await newRole.guild.fetchOwner();
 			await owner.send(`Warning! A Role ${newRole.name} in a server ${newRole.guild.name} is not mentionable. Please change the role settings for proper functioning.`);
-			return;
-		}
-
-		// if not bot role or if permissions did not change, then skip
-		if (newRole.tags === null || !('botId' in newRole.tags) || oldRole.permissions.equals(newRole.permissions)) {
 			return;
 		}
 

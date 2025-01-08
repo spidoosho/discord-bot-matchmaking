@@ -1,4 +1,4 @@
-const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, QUEUE_CHANNEL_ID, MESSAGE_QUEUE_ID, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME } = require('./constants.js');
+const { ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_NAME, CATEGORY_MAX_CHANNEL_SIZE, VALOJS_GAME_CATEGORY_NAME } = require('./constants.js');
 const { ChannelType, PermissionsBitField } = require('discord.js');
 
 /**
@@ -25,66 +25,11 @@ function getHighestPermissionName(interaction, roles) {
 	return undefined;
 }
 
-function getNumberStrWithOperand(num) {
-	if (num > 0) {
-		return `+${num}`;
-	}
-
-	return num.toString();
-}
-
-function getAverageTeamElo(team) {
-	let eloSum = 0;
-	let count = 0;
-	team.forEach(player => {
-		eloSum += parseInt(player.elo.N);
-		count++;
-	});
-
-	return eloSum / count;
-}
-
-function getPlayersId(teams) {
-	const ids = [];
-
-	for (const player of teams.team_one) {
-		ids.push(player.id.N);
-	}
-
-	for (const player of teams.team_two) {
-		ids.push(player.id.N);
-	}
-
-	return ids;
-}
-
-async function updateQueueCount(queue, interaction) {
-	const queueChannel = await interaction.guild.channels.fetch(QUEUE_CHANNEL_ID);
-	const message = await queueChannel.messages.fetch(MESSAGE_QUEUE_ID);
-	const name = `In Queue: ${Object.keys(queue).length}`;
-	await message.edit(name);
-}
-
-function addVoteForMap(lobbyVoiceChannels, params) {
-	const maps = lobbyVoiceChannels[params[0]].maps;
-
-	for (const map of maps) {
-		if (map.id.toString() === params[1]) {
-			map.count += 1;
-			return `You have voted for ${map.Name}.`;
-		}
-	}
-}
-
-function getAverageTeamRating(playerDataArr) {
-	let sum = 0;
-
-	for (const player of playerDataArr) {
-		sum += player.rating;
-	}
-	return sum;
-}
-
+/**
+ * Calculates factorial of a number
+ * @param {number} num number
+ * @returns {number}
+ */
 function factorial(num) {
 	let result = 1;
 	for (let i = 2; i <= num; i++) {
@@ -93,6 +38,12 @@ function factorial(num) {
 	return result;
 }
 
+/**
+ * Gets or create available game category channel.
+ * @param {Guild} guild guild for game category channel
+ * @param {string} botId bot ID
+ * @returns {Channel} game category channel
+ */
 async function getGamesCategoryChannel(guild, botId) {
 	const channels = Array.from(guild.channels.cache.values());
 	channels.sort((a, b) => a.name.localeCompare(b.name));
@@ -135,21 +86,23 @@ async function getGamesCategoryChannel(guild, botId) {
 	});
 }
 
-function getPlayersMentionString(team) {
-	let result = '';
-
-	for (const playerData of team) {
-		result += `<@${playerData.id}>, `;
-	}
-
-	return result.slice(0, result.length - 2);
-}
-
+/**
+ * Gets channel by name from category
+ * @param {Guild} guild guild to retrieve channel
+ * @param {string} categoryName category name
+ * @param {string} channelName channel name
+ * @returns {Channel|undefined}
+ */
 function getChannelByNameFromCategory(guild, categoryName, channelName) {
 	const category = guild.channels.cache.find(channel => channel.name === categoryName && channel.type === ChannelType.GuildCategory);
 	return guild.channels.cache.find(channel => channel.name === channelName && channel.parentId === category.id);
 }
 
+/**
+ * Gets string that mention players
+ * @param {PlayerData[]} players player data
+ * @returns {string}
+ */
 function getMentionPlayerMessage(players) {
 	let str = '';
 	for (const player of players) {
@@ -159,37 +112,33 @@ function getMentionPlayerMessage(players) {
 	return str.slice(0, str.length - 2);
 }
 
+/**
+ * Converts string in snake case to camel case
+ * @param {string} snakeStr string in snake case
+ * @returns {string}
+ */
 function convertSnakeCaseToCamelCase(snakeStr) {
 	return snakeStr.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
+/**
+ * Converts string in camel case to snake case
+ * @param {string} camelStr string in camel case
+ * @returns {string}
+ */
 function convertCamelCaseToSnakeCase(camelStr) {
 	return camelStr.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
 }
 
 /**
- *
- * @param {Guild} guild
- * @param {MatchmakingManager} matchmakingManager
+ * Creates read only channel.
+ * @param {Guild} guild guild to create channel
+ * @param {string} channelName channel name
+ * @param {Channel} categoryChannel category channel
+ * @param {string} botRoleId bot role ID
+ * @param {ChannelType} type type of channel
+ * @returns {Channel}
  */
-function getAdminRoles(guild, matchmakingManager) {
-	const guildIds = matchmakingManager.getGuildIds(guild.id);
-	const adminRoles = { };
-
-	const adminRole = guild.roles.cache.get(cachedRole => cachedRole.key === guildIds.adminRoleId);
-	const superAdminRole = guild.roles.cache.get(cachedRole => cachedRole.key === guildIds.superAdminRoleId);
-
-	if (adminRole !== undefined) {
-		adminRoles[adminRole.name] = adminRole.id;
-	}
-
-	if (superAdminRole !== undefined) {
-		adminRoles[superAdminRole.name] = superAdminRole.id;
-	}
-
-	return adminRoles;
-}
-
 async function createReadOnlyChannel(guild, channelName, categoryChannel, botRoleId, type) {
 	return guild.channels.create({
 		name: channelName,
@@ -208,9 +157,15 @@ async function createReadOnlyChannel(guild, channelName, categoryChannel, botRol
 	});
 }
 
+/**
+ * Gets client max role position
+ * @param {Client} client Discord client
+ * @param {Guild} guild guild of the role
+ * @returns {number}
+ */
 function getClientMaxRolePosition(client, guild) {
-	const clientMember = guild.members.cache.find(member => member.id == client.user.id);
+	const clientMember = guild.members.cache.find(member => member.id === client.user.id);
 	return clientMember.roles.botRole.position;
 }
 
-module.exports = { factorial, createReadOnlyChannel, getClientMaxRolePosition, getAdminRoles, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getPlayersMentionString, getMentionPlayerMessage, getHighestPermissionName, getAverageTeamRating, getChannelByNameFromCategory, getPlayersId, updateQueueCount, getAverageTeamElo, getNumberStrWithOperand, addVoteForMap, getGamesCategoryChannel };
+module.exports = { factorial, createReadOnlyChannel, getClientMaxRolePosition, convertCamelCaseToSnakeCase, convertSnakeCaseToCamelCase, getMentionPlayerMessage, getHighestPermissionName, getChannelByNameFromCategory, getGamesCategoryChannel };

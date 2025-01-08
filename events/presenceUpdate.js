@@ -31,6 +31,12 @@ module.exports = {
 	},
 };
 
+/**
+ * Creates a message to inform the user about being dequeued because of status change.
+ * @param {string} guildId guild ID
+ * @param {string} userId user ID
+ * @returns {Message}
+ */
 function createAutoDequeueMessage(guildId, userId) {
 	const row = new ActionRowBuilder()
 		.addComponents(

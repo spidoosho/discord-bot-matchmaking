@@ -1,9 +1,11 @@
-const { Events, Colors, ChannelType } = require('discord.js');
+const { Events, Colors, ChannelType, PermissionsBitField } = require('discord.js');
 const { startExpress } = require('../express/express.js');
 const { getClientMaxRolePosition, createReadOnlyChannel } = require('../src/utils.js');
 const db = require('../src/sqliteDatabase.js');
 
-const { SUPER_ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_NAME, ADMIN_ROLE_CREATE_REASON, VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { SUPER_ADMIN_ROLE_NAME, SUPER_ADMIN_ROLE_CREATE_REASON, ADMIN_ROLE_NAME, BOT_PERMISSIONS, ADMIN_ROLE_CREATE_REASON,
+	VALOJS_MAIN_CATEGORY_CHANNEL } = require('../src/constants.js');
+const { GuildIds } = require('../src/gameControllers.js');
 
 module.exports = {
 	name: Events.ClientReady,
@@ -28,24 +30,50 @@ module.exports = {
 				await db.createDatabaseForServer(sqlClient, guildId);
 			}
 
-			// TODO: check maps
-			// TODO: check permissions
+			// check Bot permissions in guild
+			const botRoleId = guild.members.cache.get(client.user.id).roles.botRole.id;
+			const botRole = guild.roles.cache.find(role => role.id === botRoleId);
+			const hasEveryPermission = botRole.permissions.has(BOT_PERMISSIONS);
+			if (!hasEveryPermission) {
+				const owner = await guild.fetchOwner();
+				await owner.send(`Bot role ${botRole.name} in guild ${guild.name} needs these permissions to function properly: ${BOT_PERMISSIONS.toArray().join(', ')}`);
+			}
 
+			// register guild in matchmaking manager
 			const guildDbIds = await db.getGuildDbIds(sqlClient, guildId);
 			matchmakingManager.addGuild(guildId, guildDbIds);
+			matchmakingManager.setGuildReady(guildId, hasEveryPermission);
 			let guildIds = matchmakingManager.getGuildIds(guildId);
 
-			// check if role in database is the same as in the server
-			guildIds = await checkForAdminRoles(client, guild, guildIds);
-			await assignRolesToOwner(guild, guildIds);
+			if (hasEveryPermission || botRole.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+				// check if role in database is the same as in the server
+				guildIds = await checkForAdminRoles(client, guild, guildIds);
+				await assignRolesToOwner(guild, guildIds);
+			}
 
-			guildIds = await checkValoJSCategories(guild, guildIds);
-			await db.updateGuildIds(sqlClient, guildId, guildIds);
+			if (hasEveryPermission || botRole.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+				guildIds = await checkValoJSCategories(guild, guildIds, botRoleId);
+				await db.updateGuildIds(sqlClient, guildId, guildIds);
+			}
 
-
+			// check maps for matchmaking
 			const maps = await db.getMapsDictByIdWithIndices(sqlClient, guildId);
 			const mapNames = Object.values(maps).map(map => map.name);
-			matchmakingManager.setMaps(guildId, mapNames);
+			if (mapNames.length !== 0) {
+				matchmakingManager.setMaps(guildId, mapNames);
+				continue;
+			}
+
+			// send message if maps are missing
+			const missingMapsMessage = 'Please add maps by act reset using command `\\reset-act <map names>`';
+			if (hasEveryPermission && 'generalChannelId' in guildIds) {
+				const generalChannel = guild.channels.cache.find(channel => channel.id === guildIds.generalChannelId);
+				await generalChannel.send(missingMapsMessage);
+			}
+			else {
+				const owner = await guild.fetchOwner();
+				await owner.send(missingMapsMessage);
+			}
 		}
 
 		// start REST API
@@ -53,6 +81,13 @@ module.exports = {
 	},
 };
 
+/**
+ * Check and create admin roles if missing
+ * @param {Client} client Discord client
+ * @param {Guild} guild guild to create roles
+ * @param {GuildIds} guildIds guild IDs
+ * @returns {GuildIds}
+ */
 async function checkForAdminRoles(client, guild, guildIds) {
 	// max possible role position for a role created by the bot
 	let clientMaxRolePosition;
@@ -97,6 +132,11 @@ async function checkForAdminRoles(client, guild, guildIds) {
 	return guildIds;
 }
 
+/**
+ * Assigns admin roles to the owner.
+ * @param {Guild} guild guild to assign roles
+ * @param {GuildIds} guildIds guild IDs
+ */
 async function assignRolesToOwner(guild, guildIds) {
 	const owner = await guild.fetchOwner();
 
@@ -109,15 +149,20 @@ async function assignRolesToOwner(guild, guildIds) {
 	}
 }
 
-async function checkValoJSCategories(guild, guildIds) {
-	const clientBotRole = guild.members.cache.find(member => member.id === guild.client.user.id).roles.botRole;
+/**
+ * Checks and creates ValoJS categories if missing
+ * @param {Guild} guild guild to check categories
+ * @param {GuildIds} guildIds guild IDs
+ * @returns {GuildIds}
+ */
+async function checkValoJSCategories(guild, guildIds, botRoleId) {
 	let valojsCategoryChannel = guild.channels.cache.find(channel => channel.id === guildIds.channelCategoryId && channel.type === ChannelType.GuildCategory);
 	let generalChannel;
 	let matchHistoryChannel;
 	let reportChannel;
 
 	if (valojsCategoryChannel === undefined) {
-		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_MAIN_CATEGORY_CHANNEL, undefined, clientBotRole.id, ChannelType.GuildCategory);
+		valojsCategoryChannel = await createReadOnlyChannel(guild, VALOJS_MAIN_CATEGORY_CHANNEL, undefined, botRoleId, ChannelType.GuildCategory);
 	}
 	else {
 		generalChannel = guild.channels.cache.find(channel => channel.id === guildIds.generalChannelId && channel.parentId === valojsCategoryChannel.id);
@@ -126,15 +171,15 @@ async function checkValoJSCategories(guild, guildIds) {
 	}
 
 	if (generalChannel === undefined) {
-		generalChannel = await createReadOnlyChannel(guild, 'general', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+		generalChannel = await createReadOnlyChannel(guild, 'general', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
 	}
 
 	if (matchHistoryChannel === undefined) {
-		matchHistoryChannel = await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+		matchHistoryChannel = await createReadOnlyChannel(guild, 'match-history', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
 	}
 
 	if (reportChannel === undefined) {
-		reportChannel = await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, clientBotRole.id, ChannelType.GuildText);
+		reportChannel = await createReadOnlyChannel(guild, 'reports', valojsCategoryChannel, botRoleId, ChannelType.GuildText);
 	}
 
 	guildIds.generalChannelId = generalChannel.id;

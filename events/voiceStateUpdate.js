@@ -30,7 +30,8 @@ module.exports = {
 
 		const players = matchmakingManager.getPlayers(newState.guild.id, newState.channelId);
 
-		if (isQueueInVoice(players, newState.channel.members)) {
+		if (isLobbyInVoice(players, newState.channel.members)) {
+			// start match
 			const playerMapsPreferences = await db.getMapsPreferencesData(sqlClient, newState.guild.id, players);
 			const [textId, match] = matchmakingManager.startMatch(newState.guild.id, newState.channelId, playerMapsPreferences);
 			const textChannel = newState.guild.channels.cache.get(textId);
@@ -43,7 +44,13 @@ module.exports = {
 	},
 };
 
-function isQueueInVoice(players, voiceChannelMembers) {
+/**
+ * Checks if every player from a lobby is in voice channel.
+ * @param {PlayerData[]} players players in the lobby
+ * @param {Map<string, GuildMember>} voiceChannelMembers members in the voice channel
+ * @returns {boolean}
+ */
+function isLobbyInVoice(players, voiceChannelMembers) {
 	for (const playerData of players) {
 		if (!voiceChannelMembers.has(playerData.id)) {
 			return false;
@@ -53,6 +60,14 @@ function isQueueInVoice(players, voiceChannelMembers) {
 	return true;
 }
 
+/**
+ * Creates team voice channels and moves players to them.
+ * @param {Guild} guild guild data
+ * @param {Match} match match data
+ * @param {VoiceChanel} voiceChannel lobby voice Channel
+ * @param {string} botId bot ID
+ * @returns
+ */
 async function createTeamChannelsAndMovePlayers(guild, match, voiceChannel, botId) {
 	const teamOneVoice = await guild.channels.create({
 		name: `${voiceChannel.name}-team-1`,
@@ -103,6 +118,14 @@ async function createTeamChannelsAndMovePlayers(guild, match, voiceChannel, botI
 	return [teamOneVoice, teamTwoVoice];
 }
 
+/**
+ * Creates result message for the match.
+ * @param {Match} match match data
+ * @param {VoiceChannel} teamOneVoice voice channel of team one
+ * @param {VoiceChannel} teamTwoVoice voice channel of team two
+ * @param {string} textId text channel ID
+ * @returns {Message}
+ */
 function createMatchMessage(match, teamOneVoice, teamTwoVoice, textId) {
 	let teamOne = `<@${match.teamOne[0].id}>`;
 	let teamTwo = `<@${match.teamTwo[0].id}>`;
@@ -140,6 +163,11 @@ function createMatchMessage(match, teamOneVoice, teamTwoVoice, textId) {
 	return { embeds: [embed], components: [row] };
 }
 
+/**
+ * Creates a message for the player who is assigned to create the lobby.
+ * @param {PlayerData} player selected player for creating the lobby
+ * @returns {Message}
+ */
 function createInGameLobbyCreatorMessage(player) {
 	return { content: `<@${player.id}>, you have been assigned to create the lobby. Send party code bellow.` };
 }

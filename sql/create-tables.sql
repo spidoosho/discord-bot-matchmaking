@@ -1,6 +1,6 @@
 CREATE TABLE Maps (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT UNIQUE
 );
 
 CREATE TABLE GuildIds (
@@ -30,6 +30,7 @@ CREATE TABLE MapHistory (
     player_id TEXT,
     map_count INTEGER,
     map_id INTEGER,
+    PRIMARY KEY (player_id, map_count),
     FOREIGN KEY (player_id) REFERENCES Players (id),
     FOREIGN KEY (map_id) REFERENCES Maps (id)
 );

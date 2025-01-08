@@ -1,9 +1,8 @@
 const { Events } = require('discord.js');
-const {	dropDatabaseByName } = require('../src/sqliteDatabase.js');
 
 /**
- * Emitted whenever this discord bot leaves a Discord server.
- * Deletes tables associated with this guild.
+ * Emitted whenever this discord Bot leaves a Discord server.
+ * Removes guild from matchmaking manager.
  */
 module.exports = {
 	name: Events.GuildDelete,
@@ -18,8 +17,6 @@ module.exports = {
 	async execute(args, client, sqlClient, matchmakingManager) {
 		const [guild] = args;
 
-		args.matchmakingManager.removeGuild(guild.id);
-
-		await dropDatabaseByName(sqlClient, guild.id);
+		matchmakingManager.removeGuild(guild.id);
 	},
 };

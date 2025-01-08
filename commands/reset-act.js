@@ -43,6 +43,7 @@ module.exports = {
 
 		await db.resetMapData(sqlClient, interaction.guildId, maps);
 		await db.resetPlayerData(sqlClient, interaction.guildId, START_ELO);
+		matchmakingManager.setMaps(interaction.guildId, maps);
 
 		const generalChannel = getChannelByNameFromCategory(interaction.guild, VALOJS_MAIN_CATEGORY_CHANNEL, 'general');
 		await generalChannel.send({ content: `Act reset. New map rotation: ${maps.join(', ')}` });

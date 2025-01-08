@@ -76,8 +76,6 @@ const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 			`Started refreshing ${commands.length} application (/) commands.`,
 		);
 
-		// TODO: remove, only for deleting old commands
-		await rest.put(Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, '1082287207722795008'), { body: [] });
 		// The put method is used to fully refresh all commands in the guild with the current set
 		const data = await rest.put(
 			Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),

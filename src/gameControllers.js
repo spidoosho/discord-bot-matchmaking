@@ -33,6 +33,7 @@ class PlayerData {
 	 * @param {number} gamesLost - Number of games lost in total.
 	 * @param {number} rating - Player current rating
 	 * @param {number} accumulatedShare - Player accumulated share of map relevances
+	 * @param {number} mapShare - Player share of map relevances
      */
 	constructor(id, username = undefined, gamesLost = undefined, gamesWon = undefined, rating = undefined, accumulatedShare = undefined, mapShare = undefined) {
 		this.id = id;
@@ -54,11 +55,15 @@ class PlayersInQueue {
 		this.queue = [];
 	}
 
-	removePlayer(id) {
+	/**
+	 * Removes player from the queue.
+	 * @param {string} playerId player ID
+	 */
+	removePlayer(playerId) {
 		let itemIndex = -1;
 
 		for (let i = 0; i < this.queue.length && itemIndex === -1; i++) {
-			if (this.queue[i].id === id) {
+			if (this.queue[i].id === playerId) {
 				itemIndex = i;
 			}
 		}
@@ -68,22 +73,43 @@ class PlayersInQueue {
 		this.queue.splice(itemIndex, 1);
 	}
 
+	/**
+	 * Adds player to the queue.
+	 * @param {PlayerData} playerData player data
+	 */
 	addPlayer(playerData) {
 		this.queue.push(playerData);
 	}
 
-	isPlayerInQueue(id) {
-		return this.	queue.some(player => player.id === id);
+	/**
+	 * Checks if player is in the queue.
+	 * @param playerId player ID
+	 * @return {boolean}
+	 */
+	isPlayerInQueue(playerId) {
+		return this.queue.some(player => player.id === playerId);
 	}
 
-	isThereEnoughPlayersForGame() {
+	/**
+	 * Checks if there are enough players for a match.
+	 * @return {boolean}
+	 */
+	isThereEnoughPlayersForMatch() {
 		return this.getPlayersCount() >= COUNT_PLAYERS_GAME;
 	}
 
+	/**
+	 * Returns the number of players in the queue.
+	 * @return {number}
+	 */
 	getPlayersCount() {
 		return this.queue.length;
 	}
 
+	/**
+	 * Extracts players from the queue for a lobby.
+	 * @return {PlayerData[]}
+	 */
 	extractPlayers() {
 		const result = this.queue.slice(0, COUNT_PLAYERS_GAME);
 		this.queue = this.queue.slice(COUNT_PLAYERS_GAME);
@@ -110,13 +136,13 @@ class VoiceLobby {
 		 */
 		this.maps = maps;
 		/**
-		 * @type {Object<string, number>} playerId: mapId
+		 * @type {Object<string, string>} playerId: mapId
 		 */
 		this.mapVotes = {};
 		/**
 		 * @type {string}
 		 */
-		this.channelCategoryId;
+		this.channelCategoryId = undefined;
 	}
 }
 
@@ -135,11 +161,24 @@ class LobbyVoiceChannels {
 		this.channelSwitch = {};
 	}
 
+	/**
+	 * Adds a lobby.
+	 * @param {string} voiceId voice channel ID
+	 * @param {string} textId text channel ID
+	 * @param {VoiceLobby} voiceLobby Voice lobby data
+	 */
 	addLobby(voiceId, textId, voiceLobby) {
 		this.channels[voiceId] = voiceLobby;
 		this.channelSwitch[textId] = voiceId;
 	}
 
+	/**
+	 * Adds a player map vote to the lobby.
+	 * @param {string} textId text channel ID
+	 * @param {string} playerId player ID
+	 * @param {string} mapId map ID
+	 * @return {boolean} true if the vote was added, false otherwise
+	 */
 	addVote(textId, playerId, mapId) {
 		const voiceLobby = this.channels[this.channelSwitch[textId]];
 
@@ -149,6 +188,11 @@ class LobbyVoiceChannels {
 		return true;
 	}
 
+	/**
+	 * Cancels an ongoing lobby.
+	 * @param {string} textId text channel ID
+	 * @return {string|undefined} lobby voice channel ID
+	 */
 	cancelLobby(textId) {
 		if (!(this.channelSwitch[textId] in this.channels)) return undefined;
 
@@ -159,6 +203,12 @@ class LobbyVoiceChannels {
 		return voiceId;
 	}
 
+	/**
+	 * Checks if a player is in the lobby.
+	 * @param {string} voiceId voice channel ID
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
 	isPlayerInLobby(voiceId, playerId) {
 		if (!(voiceId in this.channels)) return false;
 
@@ -173,6 +223,13 @@ class LobbyVoiceChannels {
 		return false;
 	}
 
+	/**
+	 * Replaces a player in the lobby.
+	 * @param {string} lobbyId lobby ID
+	 * @param {string} playerId player ID
+	 * @param {PlayerData} substitutePlayerData player data
+	 * @return {boolean|undefined} true if the player was replaced, false if the player was not found, undefined if the lobby does not exist
+	 */
 	substitutePlayer(lobbyId, playerId, substitutePlayerData) {
 		if (!(this.channelSwitch[lobbyId] in this.channels)) return undefined;
 
@@ -188,6 +245,11 @@ class LobbyVoiceChannels {
 		return false;
 	}
 
+	/**
+	 * Removes a lobby.
+	 * @param {string} voiceId voice channel ID
+	 * @return {undefined|(string|VoiceLobby)[]} returns the text channel ID and the lobby data if the lobby was removed, undefined otherwise
+	 */
 	removeLobby(voiceId) {
 		const lobby = this.channels[voiceId];
 		delete this.channels[voiceId];
@@ -202,19 +264,38 @@ class LobbyVoiceChannels {
 		return undefined;
 	}
 
+	/**
+	 * Returns the number of lobbies.
+	 * @return {number}
+	 */
 	getLobbyCount() {
 		return Object.keys(this.channels).length;
 	}
 
+	/**
+	 * Returns the lobby data.
+	 * @param voiceId voice lobby channel ID
+	 * @return {VoiceLobby}
+	 */
 	getLobby(voiceId) {
 		return this.channels[voiceId];
 	}
 
+	/**
+	 * Returns the lobby data by text channel ID.
+	 * @param {string} textId text channel ID
+	 * @return {VoiceLobby}
+	 */
 	getLobbyByTextId(textId) {
 		return this.channels[this.channelSwitch[textId]];
 	}
 
-	getPlayers(voiceId) {
+	/**
+	 * Returns the players in the lobby.
+	 * @param {string} voiceId voice channel ID
+	 * @return {PlayerData[]}
+	 */
+	getPlayersFromLobby(voiceId) {
 		return this.channels[voiceId].players;
 	}
 }
@@ -234,6 +315,10 @@ class Match {
 		this.lobbyCreator = lobbyCreator;
 	}
 
+	/**
+	 * Returns the team names.
+	 * @return {{teamTwo: string, teamOne: string}}
+	 */
 	getTeamNames() {
 		const result = { teamOne: undefined, teamTwo: undefined };
 
@@ -251,6 +336,10 @@ class Match {
 		return result;
 	}
 
+	/**
+	 * Returns the winner name.
+	 * @return {string|undefined}
+	 */
 	getWinnerName() {
 		if (this.winnerId === undefined) return undefined;
 
@@ -270,6 +359,11 @@ class OngoingMatches {
 		this.matches = {};
 	}
 
+	/**
+	 * Cancels an ongoing match.
+	 * @param textId text channel ID
+	 * @return {string[]|undefined} voice channel IDs of the match
+	 */
 	cancelMatch(textId) {
 		if (!(textId in this.matches)) return undefined;
 
@@ -283,6 +377,15 @@ class OngoingMatches {
 		return voiceIds;
 	}
 
+	/**
+	 * Adds a match to ongoing matches.
+	 * @param {string} textId
+	 * @param {string} voiceId
+	 * @param {PlayerData[][]} teams
+	 * @param {name:string, id:number, index:number} map
+	 * @param {PlayerData} lobbyCreator
+	 * @return {Match} match data
+	 */
 	addMatch(textId, voiceId, teams, map, lobbyCreator) {
 		const match = new Match(textId, voiceId, teams, map, lobbyCreator);
 		this.matches[textId] = match;
@@ -290,20 +393,35 @@ class OngoingMatches {
 		return match;
 	}
 
+	/**
+	 * Removes a match from ongoing matches.
+ 	 * @param {string} textId text channel ID
+	 */
 	removeMatch(textId) {
 		if (!(textId in this.matches)) return;
 
 		delete this.matches[textId];
 	}
 
+	/**
+	 * Returns the number of ongoing matches.
+	 * @return {number}
+	 */
 	getMatchCount() {
 		return Object.keys(this.matches).length;
 	}
 
-	canPlayerSetGameResult(gameId, playerId) {
-		if (!(gameId in this.matches)) return false;
+	/**
+	 * Checks if player can set the game result.
+	 * @param {string} matchId text channel ID
+	 * @param {string} playerId player ID
+	 * @return {boolean}
+	 */
+	canPlayerSetMatchResult(matchId, playerId) {
+		// match is not in the ongoing matches
+		if (!(matchId in this.matches)) return false;
 
-		const match = this.matches[gameId];
+		const match = this.matches[matchId];
 		for (const player of match.teamOne.concat(match.teamTwo)) {
 			if (player.id === playerId) {
 				if (match.removedFromResult.has(playerId)) {
@@ -312,7 +430,7 @@ class OngoingMatches {
 				}
 
 				if (match.submitId !== undefined) {
-					// confirmId cannot be on the same team as submitId
+					// player who submitted the result cannot confirm the result
 					return !arePlayersInTheSameTeam(match, match.submitId, playerId);
 				}
 
@@ -321,10 +439,18 @@ class OngoingMatches {
 			}
 		}
 
+		// player is not in the match
 		return false;
 	}
 
-	setGameResultSubmitter(gameId, playerId, winnerId) {
+	/**
+	 * Sets the game
+	 * @param {string} gameId game ID
+	 * @param {string} playerId player ID
+	 * @param {string} winnerId winner team ID
+	 * @return {[string, PlayerData[]]|undefined}
+	 */
+	setMatchResultSubmitter(gameId, playerId, winnerId) {
 		function getOppositeTeam(id, match) {
 			for (const playerData of match.teamOne) {
 				if (playerData.id === id) return match.teamTwo;
@@ -340,12 +466,14 @@ class OngoingMatches {
 			return undefined;
 		}
 
+		// check if match is in the ongoing matches
 		if (this.matches[gameId].submitId) return [undefined];
 
 		this.matches[gameId].winnerId = winnerId;
 		this.matches[gameId].submitId = playerId;
 		this.matches[gameId].removedFromResult.add(playerId);
 
+		// get the opposite team to confirm the result
 		const oppositeTeam = getOppositeTeam(playerId, this.matches[gameId]);
 		const selectedTeamName = getWinnerName(winnerId, this.matches[gameId]);
 
@@ -353,6 +481,14 @@ class OngoingMatches {
 		return [selectedTeamName, oppositeTeam];
 	}
 
+	/**
+	 * Confirms the game result.
+	 * @param {string} gameId game ID
+	 * @param {string} winnerTeamId winner team ID
+	 * @param {string} confirmId confirm player ID
+	 * @param {boolean} playerConfirmed if confirmed by the player or admin
+	 * @return {Match}
+	 */
 	setMatchWinner(gameId, winnerTeamId, confirmId, playerConfirmed) {
 		const match = this.matches[gameId];
 
@@ -360,6 +496,7 @@ class OngoingMatches {
 			match.confirmId = confirmId;
 		}
 		else {
+			// admin does not need to confirm the result
 			match.submitId = confirmId;
 		}
 
@@ -368,18 +505,34 @@ class OngoingMatches {
 		return match;
 	}
 
+	/**
+	 * Get match data by game ID
+	 * @param gameId game ID
+	 * @return {Match|undefined}
+	 */
 	getMatch(gameId) {
 		if (!(gameId in this.matches)) return undefined;
 
 		return this.matches[gameId];
 	}
 
+	/**
+	 * Adds created voice channels to the match data.
+	 * @param {string }gameId game ID
+	 * @param {Object[]} voiceChannels created voice channels
+	 */
 	addVoiceChannels(gameId, voiceChannels) {
 		for (const voiceChannel of voiceChannels) {
 			this.matches[gameId].teamVoiceChannels.push({ name: voiceChannel.name, id: voiceChannel.id });
 		}
 	}
 
+	/**
+	 * Rejects submitted match result.
+	 * @param gameId game ID
+	 * @param playerId player ID
+	 * @return {boolean} true if the match result was already rejected before, false otherwise
+	 */
 	rejectMatchResult(gameId, playerId) {
 		const match = this.matches[gameId];
 
@@ -390,6 +543,13 @@ class OngoingMatches {
 	}
 }
 
+/**
+ * Checks if players are in the same team.
+ * @param {Match} match match data
+ * @param {string} playerOneId first player ID
+ * @param {string} playerTwoId second player ID
+ * @return {boolean}
+ */
 function arePlayersInTheSameTeam(match, playerOneId, playerTwoId) {
 	let inTeamOne = false;
 	let inTeamTwo = false;

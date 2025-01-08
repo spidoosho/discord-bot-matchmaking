@@ -51,6 +51,12 @@ function updateMapPreferenceAfterMatch(currentValue, afterMatchValue) {
 	return (currentValue + afterMatchValue) / 2;
 }
 
+/**
+ * Get suitable maps for the players based on their preferences and match history.
+ * @param mapPreferences player map preferences
+ * @param matchHistory player match history
+ * @return selected maps based on the preferences
+ */
 async function getSuitableMaps(mapPreferences, matchHistory) {
 	let cellCount = 0;
 	[cellCount, mapPreferences.matrix] = fillEmptyPreferences(mapPreferences.matrix);
@@ -67,11 +73,18 @@ async function getSuitableMaps(mapPreferences, matchHistory) {
 		return randomMaps;
 	}
 
-	mapPreferences.matrix = adjustWeightsBasedOnHistory(mapPreferences.matrix, matchHistory);
+	mapPreferences.matrix = adjustPreferencesBasedOnHistory(mapPreferences.matrix, matchHistory);
 	const playerWeights = getPlayerWeights(mapPreferences.players);
 	return EPFuzzDA(mapPreferences, playerWeights, 3);
 }
 
+/**
+ * EPFuzzDA algorithm implementation.
+ * @param mapPreferences player map preferences
+ * @param userWeights player weights
+ * @param mapCount number of maps to select
+ * @return ordered array of selected maps
+ */
 async function EPFuzzDA(mapPreferences, userWeights, mapCount) {
 	const maps = mapPreferences.maps;
 	const players = mapPreferences.players;
@@ -105,12 +118,12 @@ async function EPFuzzDA(mapPreferences, userWeights, mapCount) {
 
 
 /**
- *
- * @param {*} mapPreferences
- * @param {{playerId: {mapId: mapCount}} playerMatchHistory
- * @returns mapPreferences
+ * Adjusts player map preferences based on their match history.
+ * @param mapPreferences player map preferences
+ * @param playerMatchHistory player match history
+ * @return map preferences
  */
-function adjustWeightsBasedOnHistory(mapPreferences, playerMatchHistory) {
+function adjustPreferencesBasedOnHistory(mapPreferences, playerMatchHistory) {
 	for (const [playerId, playerHistory] of Object.entries(playerMatchHistory)) {
 		const playerIndex = mapPreferences.players[playerId].index;
 		const mapIndex = mapPreferences.maps[playerHistory.mapId].index;
@@ -121,6 +134,12 @@ function adjustWeightsBasedOnHistory(mapPreferences, playerMatchHistory) {
 	return mapPreferences;
 }
 
+/**
+ * Get the best random index from the item gains.
+ * @param itemGains item gains
+ * @param remainingMapIndices remaining map indices
+ * @return best random index
+ */
 function getBestRandomIndex(itemGains, remainingMapIndices) {
 	const bestIndices = [];
 	let max = -1;
@@ -139,6 +158,13 @@ function getBestRandomIndex(itemGains, remainingMapIndices) {
 	return bestIndices[Math.floor(Math.random() * bestIndices.length)];
 }
 
+/**
+ * Get the map item gain.
+ * @param preferences map preferences
+ * @param userExpectedUtility user item expected utility
+ * @param mapIndex map indices
+ * @return {number}
+ */
 function getItemGain(preferences, userExpectedUtility, mapIndex) {
 	let result = 0;
 
@@ -149,6 +175,13 @@ function getItemGain(preferences, userExpectedUtility, mapIndex) {
 	return result;
 }
 
+/**
+ * Get the user item expected utility.
+ * @param itemTOT total item relevance
+ * @param userWeights player weights
+ * @param itemUserRelevance item user relevance
+ * @return {any[]}
+ */
 function getUsersExpectedUtility(itemTOT, userWeights, itemUserRelevance) {
 	const result = new Array(userWeights.length).fill(0);
 
@@ -159,12 +192,18 @@ function getUsersExpectedUtility(itemTOT, userWeights, itemUserRelevance) {
 	return result;
 }
 
+/**
+ * Fills empty preferences with the mean value.
+ * @param preferences map preferences
+ * @return map preferences
+ */
 function fillEmptyPreferences(preferences) {
 	const userMeans = new Array(preferences.length).fill(0);
 	const itemMeans = new Array(preferences[0].length).fill(0);
 	let cellMean = 0;
 	let cellCount = preferences.length * preferences[0].length;
 
+	// calculate user mean and cell mean
 	for (let u = 0; u < preferences.length; u++) {
 		let count = 0;
 		for (let i = 0; i < preferences[0].length; i++) {
@@ -184,6 +223,7 @@ function fillEmptyPreferences(preferences) {
 
 	cellMean /= cellCount;
 
+	// calculate item mean
 	for (let i = 0; i < preferences[0].length; i++) {
 		let count = 0;
 		for (let u = 0; u < preferences.length; u++) {
@@ -200,6 +240,7 @@ function fillEmptyPreferences(preferences) {
 	for (let u = 0; u < preferences.length; u++) {
 		for (let i = 0; i < preferences[0].length; i++) {
 			if (isNaN(preferences[u][i])) {
+				// if user mean or item mean is not defined then replace it with 0
 				let userBias = userMeans[u];
 				if (userBias === 0) userBias = 0;
 
@@ -214,6 +255,12 @@ function fillEmptyPreferences(preferences) {
 	return [cellCount, preferences];
 }
 
+/**
+ * Get the item relevance.
+ * @param preferences map preferences
+ * @param mapIndex map index
+ * @return {number}
+ */
 function getItemRelevance(preferences, mapIndex) {
 	let sum = 0;
 	for (let u = 0; u < preferences.length; u++) {
@@ -223,6 +270,11 @@ function getItemRelevance(preferences, mapIndex) {
 	return sum;
 }
 
+/**
+ * Get the player weights from average shares.
+ * @param players player data
+ * @return player weights
+ */
 function getPlayerWeights(players) {
 	const averageShares = getAverageShares(players);
 
@@ -234,6 +286,11 @@ function getPlayerWeights(players) {
 	return averageShares;
 }
 
+/**
+ * Get the average shares from accumulated shares
+ * @param players player data
+ * @return average shares
+ */
 function getAverageShares(players) {
 	const averageShares = {};
 	const playersWithoutShare = new Set();
@@ -252,6 +309,7 @@ function getAverageShares(players) {
 	}
 
 	for (const playerId of playersWithoutShare.values()) {
+		// estimate average share by average of others
 		averageShares[playerId] = totalAccumulatedShares / countAccumulatedShares;
 	}
 

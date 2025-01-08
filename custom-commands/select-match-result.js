@@ -1,5 +1,5 @@
 const { ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getPlayersMentionString } = require('../src/utils.js');
+const { getMentionPlayerMessage } = require('../src/utils.js');
 
 module.exports = {
 	data: { name: 'select-match-result' },
@@ -13,7 +13,7 @@ module.exports = {
 		await interaction.message.edit({ components: [] });
 		const [winnerTeamName, opponentTeam] = matchmakingManager.setGameResultSubmitter(interaction.guildId, gameId, interaction.member.id, winnerTeamId);
 
-		return interaction.reply({ content: `Player ${interaction.user} selected team ${winnerTeamName} as a winner. Please second team confirm: ${getPlayersMentionString(opponentTeam)}`,
+		return interaction.reply({ content: `Player ${interaction.user} selected team ${winnerTeamName} as a winner. Please second team confirm: ${getMentionPlayerMessage(opponentTeam)}`,
 			components: [createConfirmationButtonRow(gameId, winnerTeamId)] });
 	},
 };
